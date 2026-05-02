@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { QuizRunner, type QuizTheme } from "@/components/QuizRunner";
 import { getBeenType } from "@/lib/quiz_b2c";
@@ -21,21 +21,48 @@ const theme: QuizTheme = {
 
 export default function B2cQuizPage() {
   const [result, setResult] = useState<BeenType | null>(null);
+  const [savedSelected, setSavedSelected] = useState<QuizOption[]>([]);
+  const [quizResultId, setQuizResultId] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
 
   function handleComplete(selected: QuizOption[]) {
     const tags = selected.map((o) => o.tags ?? []);
-    setResult(getBeenType(tags));
+    const type = getBeenType(tags);
+    setResult(type);
+    setSavedSelected(selected);
   }
+
+  // 결과 화면 진입 시 백그라운드로 Supabase에 저장 (실패해도 UX 막지 않음)
+  useEffect(() => {
+    if (!result) return;
+    const blend = blends.find((b) => b.type === result);
+    const answers = Object.fromEntries(
+      savedSelected.map((o, i) => [`q${i + 1}`, o.label])
+    );
+    fetch("/api/quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pathType: "b2c",
+        answers,
+        resultType: result,
+        blendName: blend?.name,
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.quizResultId && setQuizResultId(d.quizResultId))
+      .catch((e) => console.warn("[quiz save]", e));
+  }, [result, savedSelected]);
 
   function handleRetry() {
     setResult(null);
+    setQuizResultId(null);
     setResetKey((k) => k + 1);
   }
 
   if (result) {
     const blend = blends.find((b) => b.type === result)!;
-    return <ResultView blend={blend} onRetry={handleRetry} />;
+    return <ResultView blend={blend} quizResultId={quizResultId} onRetry={handleRetry} />;
   }
 
   return (
@@ -51,9 +78,11 @@ export default function B2cQuizPage() {
 
 function ResultView({
   blend,
+  quizResultId,
   onRetry,
 }: {
   blend: Blend;
+  quizResultId: string | null;
   onRetry: () => void;
 }) {
   return (
@@ -131,7 +160,7 @@ function ResultView({
         {/* CTA */}
         <div className="space-y-3">
           <Link
-            href={`/order?type=${blend.type}&path=b2c`}
+            href={`/order?type=${blend.type}&path=b2c${quizResultId ? `&qid=${quizResultId}` : ""}`}
             className="block w-full py-4 text-white text-center rounded-2xl font-medium shadow-sm transition hover:opacity-90"
             style={{ backgroundColor: "#1D9E75" }}
           >

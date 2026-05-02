@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import questionsData from "../../../../data/questions_gift.json";
 import packagesData from "../../../../data/packages_gift.json";
@@ -321,12 +321,32 @@ function GiftResult({
   const blend = blends.find((b) => b.type === blendType)!;
   const pkg = packages.find((p) => p.id === answers.package);
   const message = getGiftMessage(answers.occasion);
+  const [quizResultId, setQuizResultId] = useState<string | null>(null);
+
+  // 백그라운드 저장
+  useEffect(() => {
+    fetch("/api/quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pathType: "gift",
+        answers,
+        resultType: blendType,
+        blendName: blend.name,
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.quizResultId && setQuizResultId(d.quizResultId))
+      .catch((e) => console.warn("[quiz save]", e));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleOrder() {
     const params = new URLSearchParams({
       type: blendType,
       pkg: answers.package ?? "",
       occasion: answers.occasion ?? "",
+      ...(quizResultId ? { qid: quizResultId } : {}),
     });
     router.push(`/order/gift?${params}`);
   }

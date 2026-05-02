@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QuizRunner, type QuizTheme } from "@/components/QuizRunner";
 import questionsData from "../../../../data/questions_pro.json";
 import blendsData from "../../../../data/blends_b2c.json";
@@ -101,6 +101,24 @@ export default function ProQuizPage() {
   function handleComplete(selected: QuizOption[]) {
     setResult(analyzePro(selected));
   }
+
+  // 결과 진입 시 백그라운드 저장
+  useEffect(() => {
+    if (!result) return;
+    const answers = Object.fromEntries(
+      result.answers.map((o, i) => [`q${i + 1}`, o.val ?? o.label])
+    );
+    fetch("/api/quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pathType: "pro",
+        answers,
+        resultType: result.recommendBlend.type,
+        blendName: result.recommendBlend.name,
+      }),
+    }).catch((e) => console.warn("[quiz save]", e));
+  }, [result]);
 
   function handleRetry() {
     setResult(null);

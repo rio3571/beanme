@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { QuizRunner, type QuizTheme } from "@/components/QuizRunner";
 import questionsData from "../../../../data/questions_office.json";
 import blendsData from "../../../../data/blends_b2c.json";
@@ -79,11 +79,33 @@ function analyzeOffice(answers: QuizOption[]): OfficeResult {
 
 export default function OfficeQuizPage() {
   const [result, setResult] = useState<OfficeResult | null>(null);
+  const lastSelectedRef = useRef<QuizOption[]>([]);
   const [resetKey, setResetKey] = useState(0);
 
   function handleComplete(selected: QuizOption[]) {
+    lastSelectedRef.current = selected;
     setResult(analyzeOffice(selected));
   }
+
+  // 결과 진입 시 백그라운드 저장
+  useEffect(() => {
+    if (!result) return;
+    const selected = lastSelectedRef.current;
+    const answers = Object.fromEntries(
+      selected.map((o, i) => [`q${i + 1}`, o.val ?? o.label])
+    );
+    fetch("/api/quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pathType: "office",
+        answers,
+        resultType: result.recommendBlend.type,
+        blendName: result.recommendBlend.name,
+      }),
+    }).catch((e) => console.warn("[quiz save]", e));
+  }, [result]);
+
   function handleRetry() {
     setResult(null);
     setResetKey((k) => k + 1);
