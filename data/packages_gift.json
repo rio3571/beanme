@@ -1,0 +1,66 @@
+[
+  {
+    "id": "s_mini",
+    "budget": "s",
+    "name": "미니 선물세트",
+    "price": 22000,
+    "items": ["원두 200g", "손편지 카드", "크래프트 박스"],
+    "popular": false
+  },
+  {
+    "id": "s_dripbag",
+    "budget": "s",
+    "name": "드립백 세트",
+    "price": 24000,
+    "items": ["드립백 10개입", "브루잉 가이드", "리본 포장"],
+    "popular": true
+  },
+  {
+    "id": "m_standard",
+    "budget": "m",
+    "name": "스탠다드 선물세트",
+    "price": 34000,
+    "items": ["원두 500g", "손편지 카드", "크래프트 박스"],
+    "popular": false
+  },
+  {
+    "id": "m_kit",
+    "budget": "m",
+    "name": "커피 킷 세트",
+    "price": 38000,
+    "items": ["원두 200g", "드립백 5개", "필터 20매", "가이드북"],
+    "popular": true
+  },
+  {
+    "id": "l_premium",
+    "budget": "l",
+    "name": "프리미엄 선물세트",
+    "price": 52000,
+    "items": ["원두 500g", "드립백 10개", "크래프트 박스", "리본"],
+    "popular": true
+  },
+  {
+    "id": "l_homecafe",
+    "budget": "l",
+    "name": "홈카페 스타터 킷",
+    "price": 65000,
+    "items": ["원두 500g", "드리퍼", "필터 40매", "계량스푼", "가이드북"],
+    "popular": false
+  },
+  {
+    "id": "xl_luxury",
+    "budget": "xl",
+    "name": "럭셔리 선물세트",
+    "price": 98000,
+    "items": ["원두 1kg", "드립백 20개", "우드 박스", "리본", "카드"],
+    "popular": false
+  },
+  {
+    "id": "xl_curation",
+    "budget": "xl",
+    "name": "커피 큐레이션 박스",
+    "price": 115000,
+    "items": ["4종 블렌드 각 200g", "테이스팅 가이드", "드리퍼", "전용 박스"],
+    "popular": true
+  }
+]

@@ -18,57 +18,79 @@ export default function Home() {
           </p>
         </div>
 
-        {/* 진입 카드 3개 */}
+        {/* 진입 카드 */}
         <div className="space-y-4">
           {paths.map((p) => (
-            <Link
-              key={p.path}
-              href={`/quiz/${p.path}`}
-              className="block bg-white rounded-2xl p-6 border-2 border-zinc-100 hover:shadow-md transition group"
-              style={{ borderColor: "#F4F4F5" }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span
-                  className="inline-block px-2.5 py-1 rounded-md text-xs font-bold tracking-wider"
-                  style={{
-                    backgroundColor: p.badgeColor,
-                    color: p.badgeTextColor,
-                  }}
-                >
-                  {p.badge}
-                </span>
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: p.primaryColor }}
-                >
-                  시작하기 →
-                </span>
-              </div>
-              <h2 className="text-xl font-bold text-zinc-900 mb-1.5">
-                {p.title}
-              </h2>
-              <p className="text-sm text-zinc-600 mb-3 leading-relaxed">
-                {p.desc}
-              </p>
-              <ul className="space-y-1">
-                {p.bullet.map((b, i) => (
-                  <li
-                    key={i}
-                    className="text-xs text-zinc-500 flex items-center gap-1.5"
-                  >
-                    <span style={{ color: p.primaryColor }}>•</span>
-                    {b}
-                  </li>
-                ))}
-              </ul>
-            </Link>
+            <PathCardLink key={p.path} card={p} />
           ))}
         </div>
 
         <p className="text-center text-xs text-zinc-400 mt-10">
-          beanme — 원두 구독 · 공급 서비스
+          beanme — 원두 구독 · 공급 · 선물 서비스
         </p>
       </div>
     </main>
+  );
+}
+
+function PathCardLink({ card }: { card: PathCard }) {
+  // 그라디언트가 있으면 그라디언트 테두리 효과 (외부 그라디언트 + 내부 흰 배경)
+  if (card.gradient) {
+    return (
+      <Link
+        href={`/quiz/${card.path}`}
+        className="block rounded-2xl p-[2px] hover:shadow-md transition group"
+        style={{ backgroundImage: card.gradient }}
+      >
+        <div className="bg-white rounded-2xl p-6 h-full">
+          <PathCardBody card={card} />
+        </div>
+      </Link>
+    );
+  }
+  return (
+    <Link
+      href={`/quiz/${card.path}`}
+      className="block bg-white rounded-2xl p-6 border-2 border-zinc-100 hover:shadow-md transition group"
+    >
+      <PathCardBody card={card} />
+    </Link>
+  );
+}
+
+function PathCardBody({ card }: { card: PathCard }) {
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <span
+          className="inline-block px-2.5 py-1 rounded-md text-xs font-bold tracking-wider"
+          style={{
+            backgroundColor: card.badgeColor,
+            color: card.badgeTextColor,
+          }}
+        >
+          {card.badge}
+        </span>
+        <span
+          className="text-xs font-medium"
+          style={{ color: card.primaryColor }}
+        >
+          시작하기 →
+        </span>
+      </div>
+      <h2 className="text-xl font-bold text-zinc-900 mb-1.5">{card.title}</h2>
+      <p className="text-sm text-zinc-600 mb-3 leading-relaxed">{card.desc}</p>
+      <ul className="space-y-1">
+        {card.bullet.map((b, i) => (
+          <li
+            key={i}
+            className="text-xs text-zinc-500 flex items-center gap-1.5"
+          >
+            <span style={{ color: card.primaryColor }}>•</span>
+            {b}
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

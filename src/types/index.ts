@@ -46,7 +46,7 @@ export interface Blend {
 
 // === 진입 카드 (랜딩) ===
 export interface PathCard {
-  path: PathType;
+  path: PathType | "gift";
   badge: string;        // "B2C" 등
   title: string;
   desc: string;
@@ -54,4 +54,43 @@ export interface PathCard {
   primaryColor: string; // 진입 색상 hex
   badgeColor: string;
   badgeTextColor: string;
+  gradient?: string;     // 옵션: 카드 테두리 그라디언트 (선물 카드용)
+}
+
+// === 선물 ===
+export type GiftBudget = "s" | "m" | "l" | "xl";
+export type BlendKey = "bright" | "balance" | "deep" | "aroma";
+export type GiftQuestionType = "grid" | "list" | "chip" | "package";
+
+export interface GiftQuestion {
+  id: string;
+  q: string;
+  sub?: string;
+  type: GiftQuestionType;
+  key: string;     // 답변을 저장할 키 (relation/style/vibe/occasion/budget/package)
+  opts: GiftQuestionOption[];
+}
+
+export interface GiftQuestionOption {
+  label: string;
+  desc?: string;
+  val?: string;     // 식별용 (없으면 label 사용)
+}
+
+export interface GiftAnswers {
+  relation?: string;
+  style?: string;
+  vibe?: string;
+  occasion?: string;
+  budget?: GiftBudget;
+  package?: string;  // 패키지 id
+}
+
+export interface GiftPackage {
+  id: string;
+  budget: GiftBudget;
+  name: string;
+  price: number;     // 원 단위
+  items: string[];   // 구성품
+  popular: boolean;  // BEST 뱃지
 }

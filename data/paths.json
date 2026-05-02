@@ -28,5 +28,16 @@
     "primaryColor": "#BA7517",
     "badgeColor": "#FBEFD8",
     "badgeTextColor": "#5C3A0E"
+  },
+  {
+    "path": "gift",
+    "badge": "선물·기프트",
+    "title": "선물용 커피 고르기",
+    "desc": "받는 사람 취향 저격 — 관계·바이브로 추천",
+    "bullet": ["관계 + 바이브 분석", "예산별 패키지", "손편지 카드 포함"],
+    "primaryColor": "#D4537E",
+    "badgeColor": "#FBEAF0",
+    "badgeTextColor": "#72243E",
+    "gradient": "linear-gradient(135deg, #D4537E 0%, #7F77DD 100%)"
   }
 ]

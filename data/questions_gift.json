@@ -1,0 +1,81 @@
+[
+  {
+    "id": "q1",
+    "key": "relation",
+    "q": "누구한테 선물할 거예요?",
+    "sub": "받는 사람을 떠올려보세요 — 관계가 커피를 결정합니다.",
+    "type": "grid",
+    "opts": [
+      { "label": "친한 친구", "desc": "뭐든 솔직하게 말할 수 있는", "val": "friend" },
+      { "label": "직장 동료·상사", "desc": "센스 있어 보여야 하는", "val": "colleague" },
+      { "label": "연인·배우자", "desc": "취향 저격이 필요한", "val": "partner" },
+      { "label": "부모님·어르신", "desc": "정성이 느껴져야 하는", "val": "parent" },
+      { "label": "생일 주인공", "desc": "특별한 날을 위한", "val": "birthday_person" },
+      { "label": "거래처·클라이언트", "desc": "격식 있게 감사 전하는", "val": "client" }
+    ]
+  },
+  {
+    "id": "q2",
+    "key": "style",
+    "q": "그 사람, 커피 어떻게 마시는 편이에요?",
+    "sub": "잘 모르면 그냥 느낌으로 골라도 OK.",
+    "type": "list",
+    "opts": [
+      { "label": "아메리카노 블랙만", "desc": "진하고 쓴 거 좋아하는 타입", "val": "black" },
+      { "label": "라떼·달달한 커피 위주", "desc": "우유 들어간 걸 즐기는 타입", "val": "milk" },
+      { "label": "핸드드립·스페셜티 즐겨", "desc": "커피에 진심인 타입", "val": "specialty" },
+      { "label": "잘 모르겠어요", "desc": "아무거나 좋아하는 것 같기도 하고", "val": "unsure" }
+    ]
+  },
+  {
+    "id": "q3",
+    "key": "vibe",
+    "q": "그 사람을 한 단어로 표현하면?",
+    "sub": "성격이 취향을 만듭니다. 직감으로 골라요.",
+    "type": "chip",
+    "opts": [
+      { "label": "에너지 넘치는", "val": "energetic" },
+      { "label": "조용하고 차분한", "val": "calm" },
+      { "label": "트렌디하고 감각적인", "val": "trendy" },
+      { "label": "따뜻하고 포근한", "val": "warm" },
+      { "label": "실용적이고 똑부러진", "val": "practical" },
+      { "label": "감성적이고 낭만적인", "val": "romantic" }
+    ]
+  },
+  {
+    "id": "q4",
+    "key": "occasion",
+    "q": "어떤 순간에 선물할 예정이에요?",
+    "sub": "타이밍이 메시지가 됩니다.",
+    "type": "chip",
+    "opts": [
+      { "label": "생일", "val": "birthday" },
+      { "label": "감사 인사", "val": "thanks" },
+      { "label": "축하", "val": "celebrate" },
+      { "label": "그냥, 생각나서", "val": "random" },
+      { "label": "명절·기념일", "val": "anniversary" },
+      { "label": "비즈니스 답례", "val": "business" }
+    ]
+  },
+  {
+    "id": "q5",
+    "key": "budget",
+    "q": "예산은 어느 정도?",
+    "sub": "패키지 구성이 달라져요.",
+    "type": "chip",
+    "opts": [
+      { "label": "2만원대", "val": "s" },
+      { "label": "3~4만원대", "val": "m" },
+      { "label": "5~7만원대", "val": "l" },
+      { "label": "10만원 이상", "val": "xl" }
+    ]
+  },
+  {
+    "id": "q6",
+    "key": "package",
+    "q": "패키지를 골라주세요",
+    "sub": "모든 패키지는 선물용 박스 포장 + 손편지 카드 포함",
+    "type": "package",
+    "opts": []
+  }
+]
