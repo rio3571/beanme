@@ -2,6 +2,8 @@
   {
     "id": "q1",
     "q": "월요일 아침, 당신의 첫 커피는?",
+    "sub": "정답은 없어요. 솔직한 본능으로 골라주세요.",
+    "type": "list",
     "opts": [
       { "label": "에스프레소 한 잔, 빠르게 직진", "tags": ["strong", "dark"] },
       { "label": "과일향 핸드드립 천천히", "tags": ["bright", "fruity"] },
@@ -12,16 +14,20 @@
   {
     "id": "q2",
     "q": "카페에서 원하는 자리는?",
+    "sub": "공간이 커피 취향을 말해줄 수 있거든요.",
+    "type": "list",
     "opts": [
       { "label": "창가 햇살 자리", "tags": ["bright", "mild"] },
       { "label": "구석 나무 테이블", "tags": ["dark", "strong"] },
       { "label": "바 자리, 바리스타 옆", "tags": ["balanced", "nutty"] },
-      { "label": "어디든, 커피만 좋으면", "tags": ["strong", "balanced"] }
+      { "label": "어디든 상관없어, 커피만 좋으면", "tags": ["strong", "balanced"] }
     ]
   },
   {
     "id": "q3",
     "q": "커피를 마실 때 가장 먼저 느끼고 싶은 건?",
+    "sub": "첫 모금의 감각을 상상해보세요.",
+    "type": "list",
     "opts": [
       { "label": "탁 치는 쓴맛과 바디감", "tags": ["dark", "strong"] },
       { "label": "상큼하게 올라오는 산미", "tags": ["bright", "fruity"] },
@@ -32,6 +38,8 @@
   {
     "id": "q4",
     "q": "지금 당신의 상태는?",
+    "sub": "오늘 커피가 해줬으면 하는 역할이요.",
+    "type": "list",
     "opts": [
       { "label": "각성이 필요해, 졸려 죽겠어", "tags": ["strong", "dark"] },
       { "label": "기분 전환이 필요해", "tags": ["bright", "fruity"] },
@@ -42,9 +50,11 @@
   {
     "id": "q5",
     "q": "여행지에서 마시는 커피, 어떤 게 끌려?",
+    "sub": "여행 스타일이 커피 취향과 연결돼요.",
+    "type": "list",
     "opts": [
       { "label": "현지 전통 에스프레소 바에서", "tags": ["strong", "dark"] },
-      { "label": "스페셜티 카페, 싱글오리진", "tags": ["bright", "fruity", "aroma"] },
+      { "label": "스페셜티 카페에서 싱글오리진", "tags": ["bright", "fruity", "aroma"] },
       { "label": "숙소에서 직접 내려 마시기", "tags": ["balanced", "mild"] },
       { "label": "뭐든 상관없어, 분위기가 중요해", "tags": ["mild", "floral"] }
     ]
@@ -52,6 +62,8 @@
   {
     "id": "q6",
     "q": "친구가 커피 한 잔 사준다면?",
+    "sub": "부담 없이 떠올려보세요.",
+    "type": "list",
     "opts": [
       { "label": "아메리카노 진하게", "tags": ["strong", "dark"] },
       { "label": "에티오피아 예가체프 핸드드립", "tags": ["bright", "fruity", "aroma"] },
@@ -61,7 +73,9 @@
   },
   {
     "id": "q7",
-    "q": "커피 향 맡았을 때 생각나는 이미지?",
+    "q": "커피 향을 맡았을 때 생각나는 이미지는?",
+    "sub": "직관적으로 떠오르는 걸 골라주세요.",
+    "type": "list",
     "opts": [
       { "label": "새벽 공기, 선명하고 차가운", "tags": ["bright", "aroma"] },
       { "label": "장작 타는 모닥불 옆", "tags": ["dark", "strong"] },
@@ -71,10 +85,12 @@
   },
   {
     "id": "q8",
-    "q": "커피는 나에게?",
+    "q": "마지막 질문 — 커피는 나에게?",
+    "sub": "이 답이 당신의 취향 유형을 완성합니다.",
+    "type": "list",
     "opts": [
       { "label": "연료야, 없으면 못 살아", "tags": ["strong", "dark"] },
-      { "label": "취미야, 탐구하는 재미", "tags": ["bright", "fruity", "aroma"] },
+      { "label": "취미야, 탐구하는 재미가 있어", "tags": ["bright", "fruity", "aroma"] },
       { "label": "루틴이야, 하루의 신호", "tags": ["balanced", "mild"] },
       { "label": "감성이야, 분위기와 함께", "tags": ["floral", "aroma", "mild"] }
     ]

@@ -1,0 +1,32 @@
+[
+  {
+    "path": "b2c",
+    "badge": "B2C",
+    "title": "내 취향 원두 찾기",
+    "desc": "MBTI처럼 8문항으로 내 커피 유형을 찾아드려요.",
+    "bullet": ["개인 · 홈카페", "정기구독 200g~1kg", "취향 분석 + 추천 블렌드"],
+    "primaryColor": "#1D9E75",
+    "badgeColor": "#E1F5EE",
+    "badgeTextColor": "#085041"
+  },
+  {
+    "path": "pro",
+    "badge": "B2B PRO",
+    "title": "카페 메뉴용 원두 소싱",
+    "desc": "상권·메뉴·운영 분석 후 맞춤 블렌드를 제안합니다.",
+    "bullet": ["카페 · 로스터리", "5kg~ / 정기 공급", "포지셔닝 + 공급 상담"],
+    "primaryColor": "#534AB7",
+    "badgeColor": "#EEEDFE",
+    "badgeTextColor": "#3C3489"
+  },
+  {
+    "path": "office",
+    "badge": "B2B OFFICE",
+    "title": "사무실·단체 원두 공급",
+    "desc": "공간·머신·예산에 맞춘 공급 플랜을 만들어드려요.",
+    "bullet": ["사무실 · 식당 · 호텔", "정기 배송 + 견적", "분쇄도 세팅 무료"],
+    "primaryColor": "#BA7517",
+    "badgeColor": "#FBEFD8",
+    "badgeTextColor": "#5C3A0E"
+  }
+]

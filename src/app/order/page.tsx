@@ -3,36 +3,48 @@
 import { useState, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import blendsData from "../../../data/blends.json";
+import blendsData from "../../../data/blends_b2c.json";
+import pathsData from "../../../data/paths.json";
 import type {
   Blend,
   BeenType,
-  SubscriptionInterval,
-  SubscriptionAmount,
-  GrindType,
+  PathType,
+  PathCard,
 } from "@/types";
+import type {
+  OrderFrequency,
+  GrindType,
+} from "@/types/order";
 
 const blends = blendsData as Blend[];
+const paths = pathsData as PathCard[];
 
+type SubAmount = "200g" | "500g" | "1kg";
+type BulkAmount = "5kg" | "8kg" | "10kg" | "custom";
 type Mode = "subscription" | "bulk";
 
-const INTERVALS: { value: SubscriptionInterval; label: string }[] = [
+const FREQUENCIES: { value: OrderFrequency; label: string }[] = [
   { value: "monthly", label: "월 1회" },
   { value: "biweekly", label: "격주" },
   { value: "weekly", label: "매주" },
 ];
-const SUB_AMOUNTS: SubscriptionAmount[] = [200, 500, 1000];
-const BULK_AMOUNTS = [5000, 8000, 10000] as const;
+const SUB_AMOUNTS: SubAmount[] = ["200g", "500g", "1kg"];
+const BULK_AMOUNTS: BulkAmount[] = ["5kg", "8kg", "10kg", "custom"];
 const GRIND_TYPES: { value: GrindType; label: string }[] = [
-  { value: "wholebean", label: "홀빈" },
+  { value: "whole", label: "홀빈" },
   { value: "espresso", label: "에스프레소" },
-  { value: "drip", label: "핸드드립" },
+  { value: "drip", label: "드립" },
 ];
 
-// 단가 (간단 추정; 실제는 백엔드/관리자 설정)
-const SUB_PRICE_PER_100G = 4500; // 원
+// 단가 (수정 빈번 가능 — 추후 JSON 또는 DB로 분리 예정)
+const SUB_PRICE_PER_100G = 4500;
 const BULK_PRICE_PER_KG = 35000;
 
+function parseGrams(amount: SubAmount | BulkAmount, custom: number): number {
+  if (amount === "custom") return custom * 1000;
+  if (amount.endsWith("kg")) return parseInt(amount) * 1000;
+  return parseInt(amount); // "200g" 등
+}
 function formatWon(n: number) {
   return n.toLocaleString("ko-KR") + "원";
 }
@@ -40,55 +52,59 @@ function formatWon(n: number) {
 function OrderBody() {
   const params = useSearchParams();
   const typeParam = (params.get("type") || "BALANCE") as BeenType;
-  const blend = blends.find((b) => b.type === typeParam) ?? blends[1];
+  const pathParam = (params.get("path") || "b2c") as PathType;
 
-  const [mode, setMode] = useState<Mode>("subscription");
+  const blend = blends.find((b) => b.type === typeParam) ?? blends[1];
+  const pathInfo = paths.find((p) => p.path === pathParam) ?? paths[0];
+  const isB2B = pathParam !== "b2c";
+
+  // 모드 default — B2B는 정량, B2C는 구독
+  const [mode, setMode] = useState<Mode>(isB2B ? "bulk" : "subscription");
 
   // 구독 상태
-  const [interval, setInterval] = useState<SubscriptionInterval>("monthly");
-  const [subAmount, setSubAmount] = useState<SubscriptionAmount>(500);
+  const [frequency, setFrequency] = useState<OrderFrequency>("monthly");
+  const [subAmount, setSubAmount] = useState<SubAmount>("500g");
 
   // 정량 상태
-  const [bulkAmount, setBulkAmount] = useState<number>(5000);
-  const [bulkCustom, setBulkCustom] = useState<string>("");
-  const [grind, setGrind] = useState<GrindType>("wholebean");
+  const [bulkAmount, setBulkAmount] = useState<BulkAmount>("5kg");
+  const [customKg, setCustomKg] = useState("");
 
-  // 가격 계산
+  // 분쇄도
+  const [grind, setGrind] = useState<GrindType>("whole");
+
   const summary = useMemo(() => {
     if (mode === "subscription") {
-      const price = (subAmount / 100) * SUB_PRICE_PER_100G;
-      const intervalLabel = INTERVALS.find((x) => x.value === interval)?.label ?? "";
+      const grams = parseGrams(subAmount, 0);
+      const price = (grams / 100) * SUB_PRICE_PER_100G;
+      const freqLabel = FREQUENCIES.find((f) => f.value === frequency)?.label ?? "";
       return {
         title: "정기구독",
         lines: [
           { k: "블렌드", v: blend.name },
-          { k: "주기", v: intervalLabel },
-          { k: "수량", v: `${subAmount}g / 회` },
+          { k: "주기", v: freqLabel },
+          { k: "회당 수량", v: subAmount },
+          { k: "분쇄도", v: GRIND_TYPES.find((g) => g.value === grind)!.label },
         ],
         price,
-        priceLabel: `${intervalLabel} 결제`,
+        priceLabel: `${freqLabel} 결제`,
       };
     }
-    const useBulk = bulkAmount;
-    const price = (useBulk / 1000) * BULK_PRICE_PER_KG;
-    const grindLabel = GRIND_TYPES.find((x) => x.value === grind)?.label ?? "";
+    const customNum = parseInt(customKg) || 0;
+    const grams = parseGrams(bulkAmount, customNum);
+    const price = (grams / 1000) * BULK_PRICE_PER_KG;
+    const amountLabel =
+      bulkAmount === "custom" ? `${customNum}kg` : bulkAmount;
     return {
       title: "정량구매 (B2B)",
       lines: [
         { k: "블렌드", v: blend.name },
-        { k: "수량", v: `${(useBulk / 1000).toFixed(useBulk % 1000 === 0 ? 0 : 1)}kg` },
-        { k: "분쇄도", v: grindLabel },
+        { k: "수량", v: amountLabel },
+        { k: "분쇄도", v: GRIND_TYPES.find((g) => g.value === grind)!.label },
       ],
       price,
       priceLabel: "1회 결제",
     };
-  }, [mode, blend, interval, subAmount, bulkAmount, grind]);
-
-  function handleBulkCustom(v: string) {
-    setBulkCustom(v);
-    const num = parseInt(v.replace(/[^0-9]/g, ""), 10);
-    if (!isNaN(num) && num > 0) setBulkAmount(num * 1000); // kg → g
-  }
+  }, [mode, blend.name, frequency, subAmount, bulkAmount, customKg, grind]);
 
   return (
     <main className="min-h-screen bg-zinc-50">
@@ -96,7 +112,7 @@ function OrderBody() {
         {/* 헤더 */}
         <div className="mb-6">
           <Link
-            href="/quiz"
+            href={`/quiz/${pathParam}`}
             className="text-sm text-zinc-500 hover:text-zinc-800"
           >
             ← 결과로 돌아가기
@@ -104,136 +120,128 @@ function OrderBody() {
           <h1 className="text-2xl font-bold text-zinc-900 mt-3 mb-1">
             구매 옵션
           </h1>
-          <p className="text-sm text-zinc-600">
+          <p className="text-sm text-zinc-600 flex items-center gap-2">
             <span
-              className="inline-block px-2 py-0.5 rounded text-xs font-bold mr-2"
+              className="inline-block px-2 py-0.5 rounded text-xs font-bold"
               style={{
                 backgroundColor: blend.badgeColor,
-                color: blend.badgTextColor,
+                color: blend.badgeTextColor,
               }}
             >
               {blend.badgeText}
             </span>
-            {blend.name}
+            {blend.name} · {pathInfo.badge}
           </p>
         </div>
 
         <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-6">
-          {/* === 좌: 옵션 선택 === */}
           <div className="space-y-4">
             {/* 모드 토글 */}
             <div className="grid grid-cols-2 bg-white rounded-2xl p-1 border border-zinc-200">
-              <button
+              <ModeButton
+                active={mode === "subscription"}
                 onClick={() => setMode("subscription")}
-                className={`py-3 rounded-xl text-sm font-medium transition ${
-                  mode === "subscription"
-                    ? "bg-emerald-700 text-white shadow"
-                    : "text-zinc-600"
-                }`}
+                color={pathInfo.primaryColor}
               >
                 정기구독
-              </button>
-              <button
+              </ModeButton>
+              <ModeButton
+                active={mode === "bulk"}
                 onClick={() => setMode("bulk")}
-                className={`py-3 rounded-xl text-sm font-medium transition ${
-                  mode === "bulk"
-                    ? "bg-emerald-700 text-white shadow"
-                    : "text-zinc-600"
-                }`}
+                color={pathInfo.primaryColor}
               >
-                정량구매 (B2B)
-              </button>
+                정량구매
+              </ModeButton>
             </div>
 
             {mode === "subscription" ? (
               <>
-                {/* 주기 */}
                 <Section title="배송 주기">
                   <div className="grid grid-cols-3 gap-2">
-                    {INTERVALS.map((it) => (
-                      <ChipButton
-                        key={it.value}
-                        active={interval === it.value}
-                        onClick={() => setInterval(it.value)}
+                    {FREQUENCIES.map((f) => (
+                      <Chip
+                        key={f.value}
+                        active={frequency === f.value}
+                        onClick={() => setFrequency(f.value)}
+                        color={pathInfo.primaryColor}
                       >
-                        {it.label}
-                      </ChipButton>
+                        {f.label}
+                      </Chip>
                     ))}
                   </div>
                 </Section>
-                {/* 수량 */}
                 <Section title="회당 수량">
                   <div className="grid grid-cols-3 gap-2">
                     {SUB_AMOUNTS.map((a) => (
-                      <ChipButton
+                      <Chip
                         key={a}
                         active={subAmount === a}
                         onClick={() => setSubAmount(a)}
+                        color={pathInfo.primaryColor}
                       >
-                        {a < 1000 ? `${a}g` : `${a / 1000}kg`}
-                      </ChipButton>
+                        {a}
+                      </Chip>
                     ))}
                   </div>
                 </Section>
               </>
             ) : (
-              <>
-                {/* 정량 수량 */}
-                <Section title="구매 수량">
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {BULK_AMOUNTS.map((a) => (
-                      <ChipButton
-                        key={a}
-                        active={bulkAmount === a && !bulkCustom}
-                        onClick={() => {
-                          setBulkAmount(a);
-                          setBulkCustom("");
-                        }}
-                      >
-                        {a / 1000}kg
-                      </ChipButton>
-                    ))}
-                  </div>
-                  <div>
-                    <label className="block text-xs text-zinc-500 mb-1">
-                      커스텀 (kg)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="예: 15"
-                      value={bulkCustom}
-                      onChange={(e) => handleBulkCustom(e.target.value)}
-                      className="w-full px-4 py-3 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </Section>
-                {/* 분쇄도 */}
-                <Section title="분쇄도">
-                  <div className="grid grid-cols-3 gap-2">
-                    {GRIND_TYPES.map((g) => (
-                      <ChipButton
-                        key={g.value}
-                        active={grind === g.value}
-                        onClick={() => setGrind(g.value)}
-                      >
-                        {g.label}
-                      </ChipButton>
-                    ))}
-                  </div>
-                </Section>
-              </>
+              <Section title="구매 수량">
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {BULK_AMOUNTS.map((a) => (
+                    <Chip
+                      key={a}
+                      active={bulkAmount === a}
+                      onClick={() => setBulkAmount(a)}
+                      color={pathInfo.primaryColor}
+                    >
+                      {a === "custom" ? "직접입력" : a}
+                    </Chip>
+                  ))}
+                </div>
+                {bulkAmount === "custom" && (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="kg 입력 (예: 15)"
+                    value={customKg}
+                    onChange={(e) =>
+                      setCustomKg(e.target.value.replace(/[^0-9]/g, ""))
+                    }
+                    className="w-full px-4 py-3 border border-zinc-200 rounded-xl text-zinc-900 focus:outline-none"
+                    style={{ borderColor: customKg ? pathInfo.primaryColor : undefined }}
+                  />
+                )}
+              </Section>
             )}
+
+            <Section title="분쇄도">
+              <div className="grid grid-cols-3 gap-2">
+                {GRIND_TYPES.map((g) => (
+                  <Chip
+                    key={g.value}
+                    active={grind === g.value}
+                    onClick={() => setGrind(g.value)}
+                    color={pathInfo.primaryColor}
+                  >
+                    {g.label}
+                  </Chip>
+                ))}
+              </div>
+            </Section>
           </div>
 
-          {/* === 우: 주문 요약 === */}
+          {/* 우: 주문 요약 */}
           <aside className="mt-6 lg:mt-0">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-zinc-100 lg:sticky lg:top-6">
               <h3 className="text-sm font-semibold text-zinc-500 mb-4 tracking-wide">
                 주문 요약
               </h3>
               <div className="mb-4">
-                <p className="text-emerald-700 text-sm font-medium mb-2">
+                <p
+                  className="text-sm font-medium mb-2"
+                  style={{ color: pathInfo.primaryColor }}
+                >
                   {summary.title}
                 </p>
                 <ul className="space-y-2 text-sm">
@@ -253,14 +261,15 @@ function OrderBody() {
                   </span>
                 </div>
                 <p className="text-xs text-zinc-400">
-                  결제는 다음 단계에서 진행됩니다 (예정)
+                  결제 모듈은 추후 연결 예정
                 </p>
               </div>
               <button
-                className="w-full py-4 bg-emerald-700 text-white rounded-2xl font-medium hover:bg-emerald-800 transition shadow-sm"
-                onClick={() => alert("결제 모듈은 다음 Phase에서 연결 예정")}
+                onClick={() => alert("상담 신청은 다음 단계에서 연결 예정")}
+                className="w-full py-4 text-white rounded-2xl font-medium transition shadow-sm hover:opacity-90"
+                style={{ backgroundColor: pathInfo.primaryColor }}
               >
-                {mode === "subscription" ? "구독 시작하기" : "주문하기"}
+                {isB2B ? "상담 신청하기" : "구독 시작하기"}
               </button>
             </div>
           </aside>
@@ -270,13 +279,63 @@ function OrderBody() {
   );
 }
 
-function Section({
-  title,
+function ModeButton({
+  active,
+  onClick,
+  color,
   children,
 }: {
-  title: string;
+  active: boolean;
+  onClick: () => void;
+  color: string;
   children: React.ReactNode;
 }) {
+  return (
+    <button
+      onClick={onClick}
+      className="py-3 rounded-xl text-sm font-medium transition"
+      style={
+        active
+          ? { backgroundColor: color, color: "#FFFFFF", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
+          : { backgroundColor: "transparent", color: "#71717A" }
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function Chip({
+  active,
+  onClick,
+  color,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  color: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="py-3 rounded-xl text-sm font-medium border-2 transition"
+      style={
+        active
+          ? {
+              borderColor: color,
+              backgroundColor: color + "15", // 약 8% opacity
+              color: color,
+            }
+          : { borderColor: "#E4E4E7", backgroundColor: "#FFFFFF", color: "#3F3F46" }
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl p-5 border border-zinc-100">
       <h3 className="text-sm font-semibold text-zinc-500 mb-3 tracking-wide">
@@ -284,29 +343,6 @@ function Section({
       </h3>
       {children}
     </div>
-  );
-}
-
-function ChipButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`py-3 rounded-xl text-sm font-medium border-2 transition ${
-        active
-          ? "border-emerald-500 bg-emerald-50 text-emerald-900"
-          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

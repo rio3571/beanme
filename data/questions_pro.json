@@ -1,0 +1,93 @@
+[
+  {
+    "id": "q1",
+    "section": "상권 분석",
+    "q": "카페가 위치한 상권은 어디에 가깝나요?",
+    "sub": "상권에 따라 고객 기대치와 적정 원두 단가가 달라집니다.",
+    "type": "list",
+    "opts": [
+      { "label": "강남·홍대·성수 등 트렌디 상권", "desc": "스페셜티·싱글오리진 수요 높음", "val": "trendy" },
+      { "label": "오피스·직장인 밀집 지역", "desc": "아메리카노·라떼 회전율 중심", "val": "office" },
+      { "label": "주택가·동네 카페", "desc": "단골 위주, 편안함과 가성비 중요", "val": "local" },
+      { "label": "관광지·쇼핑몰·복합시설", "desc": "테이크아웃·속도 중심", "val": "tourist" }
+    ]
+  },
+  {
+    "id": "q2",
+    "section": "상권 분석",
+    "q": "주요 고객층은 누구인가요?",
+    "sub": "복수 답변 중 가장 비중 높은 한 그룹을 골라주세요.",
+    "type": "grid",
+    "opts": [
+      { "label": "20-30대 직장인", "desc": "트렌드 민감", "val": "young_office" },
+      { "label": "40-50대 단골", "desc": "익숙한 맛 선호", "val": "older_regular" },
+      { "label": "대학생·젊은층", "desc": "가성비 중시", "val": "student" },
+      { "label": "외국인 관광객", "desc": "스페셜티 기대", "val": "tourist_intl" }
+    ]
+  },
+  {
+    "id": "q3",
+    "section": "메뉴 구성",
+    "q": "아메리카노 한 잔 판매 가격은?",
+    "sub": "가격대가 원두 등급 결정의 기준이 됩니다.",
+    "type": "chip",
+    "opts": [
+      { "label": "2,000~3,000원", "val": "budget" },
+      { "label": "3,500~4,500원", "val": "mid" },
+      { "label": "5,000~6,000원", "val": "premium" },
+      { "label": "6,500원 이상", "val": "specialty" }
+    ]
+  },
+  {
+    "id": "q4",
+    "section": "메뉴 구성",
+    "q": "하루 평균 에스프레소 추출 샷 수는?",
+    "sub": "추출량으로 월 원두 소비량을 추정합니다.",
+    "type": "chip",
+    "opts": [
+      { "label": "50샷 이하", "val": "low" },
+      { "label": "50~150샷", "val": "mid" },
+      { "label": "150~300샷", "val": "high" },
+      { "label": "300샷 이상", "val": "very_high" }
+    ]
+  },
+  {
+    "id": "q5",
+    "section": "메뉴 구성",
+    "q": "주력 메뉴 구성은?",
+    "sub": "메뉴 비중이 추천 블렌드 방향을 결정합니다.",
+    "type": "list",
+    "opts": [
+      { "label": "에스프레소·아메리카노 위주", "val": "black" },
+      { "label": "라떼·우유 음료 위주", "val": "milk" },
+      { "label": "블랙·밀크 균형", "val": "balance" },
+      { "label": "스페셜티·핸드드립 포함", "val": "specialty" }
+    ]
+  },
+  {
+    "id": "q6",
+    "section": "운영 방식",
+    "q": "현재 원두 수급 방식은?",
+    "sub": "현재 상태에 따라 전환 부담이 달라집니다.",
+    "type": "list",
+    "opts": [
+      { "label": "로스터리에서 소량 구매 중", "val": "roastery" },
+      { "label": "대형 유통사 OEM 사용 중", "val": "oem" },
+      { "label": "직접 로스팅 또는 준비 중", "val": "self" },
+      { "label": "아직 오픈 전 / 변경 검토 중", "val": "new" }
+    ]
+  },
+  {
+    "id": "q7",
+    "section": "운영 방식",
+    "q": "원두에서 가장 중요하게 생각하는 건?",
+    "sub": "선택에 따라 추천 우선순위가 바뀝니다.",
+    "type": "list",
+    "opts": [
+      { "label": "일정한 맛 — 매일 같은 퀄리티", "val": "consistency" },
+      { "label": "원가 경쟁력 — 수익률 확보", "val": "cost" },
+      { "label": "차별화 — 우리만의 시그니처", "val": "unique" },
+      { "label": "신선도 — 로스팅 날짜 관리", "val": "fresh" }
+    ]
+  }
+]
