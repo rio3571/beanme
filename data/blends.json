@@ -1,0 +1,61 @@
+[
+  {
+    "type": "BRIGHT",
+    "name": "선라이즈 블렌드",
+    "tagline": "햇살 같은 첫 모금",
+    "badgeText": "BRIGHT",
+    "badgeColor": "#FEF3C7",
+    "badgTextColor": "#92400E",
+    "ratio": [
+      { "origin": "에티오피아 예가체프", "percent": 60, "color": "#F59E0B" },
+      { "origin": "케냐 AA", "percent": 40, "color": "#FBBF24" }
+    ],
+    "flavors": ["복숭아", "자몽", "재스민", "홍차"],
+    "roast": "라이트"
+  },
+  {
+    "type": "BALANCE",
+    "name": "미드나잇 밸런스",
+    "tagline": "균형 잡힌 한 잔의 여유",
+    "badgeText": "BALANCE",
+    "badgeColor": "#D1FAE5",
+    "badgTextColor": "#065F46",
+    "ratio": [
+      { "origin": "콜롬비아 수프리모", "percent": 50, "color": "#10B981" },
+      { "origin": "브라질 세하도", "percent": 30, "color": "#34D399" },
+      { "origin": "과테말라 안티구아", "percent": 20, "color": "#6EE7B7" }
+    ],
+    "flavors": ["카라멜", "헤이즐넛", "다크초콜릿"],
+    "roast": "미디엄"
+  },
+  {
+    "type": "DEEP",
+    "name": "다크 사이드 블렌드",
+    "tagline": "묵직한 깊이의 여운",
+    "badgeText": "DEEP",
+    "badgeColor": "#E7E5E4",
+    "badgTextColor": "#1C1917",
+    "ratio": [
+      { "origin": "수마트라 만델링", "percent": 50, "color": "#44403C" },
+      { "origin": "브라질 내추럴", "percent": 30, "color": "#78716C" },
+      { "origin": "인도 몬순", "percent": 20, "color": "#A8A29E" }
+    ],
+    "flavors": ["다크초콜릿", "흑설탕", "씁쓸한 오크"],
+    "roast": "다크"
+  },
+  {
+    "type": "AROMA",
+    "name": "플로럴 가든 블렌드",
+    "tagline": "향으로 기억되는 시간",
+    "badgeText": "AROMA",
+    "badgeColor": "#FCE7F3",
+    "badgTextColor": "#9D174D",
+    "ratio": [
+      { "origin": "파나마 게이샤", "percent": 40, "color": "#EC4899" },
+      { "origin": "에티오피아 내추럴", "percent": 40, "color": "#F472B6" },
+      { "origin": "예멘 모카", "percent": 20, "color": "#F9A8D4" }
+    ],
+    "flavors": ["장미", "베르가못", "복숭아", "라벤더"],
+    "roast": "라이트-미디엄"
+  }
+]
