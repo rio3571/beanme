@@ -27,7 +27,9 @@ export default function TestPage() {
           `✅ 성공\nstatus: ${r.status}\nquizResultId: ${data.quizResultId}\ncustomerId: ${data.customerId}`
         );
       } else {
-        setResult(`❌ 실패\nstatus: ${r.status}\nerror: ${data.error}`);
+        setResult(
+          `❌ 실패\nstatus: ${r.status}\nerror: ${data.error}\ndetails: ${JSON.stringify(data.details, null, 2)}`
+        );
       }
     } catch (err) {
       setResult(

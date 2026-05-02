@@ -93,8 +93,17 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[/api/quiz] error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Supabase PostgrestError 등 다양한 형태 대응 (instanceof Error 아님)
+    let message = "Unknown error";
+    let details: unknown = null;
+    if (err instanceof Error) {
+      message = err.message;
+    } else if (typeof err === "object" && err !== null) {
+      const o = err as Record<string, unknown>;
+      if (typeof o.message === "string") message = o.message;
+      details = err;
+    }
+    console.error("[/api/quiz] error:", err);
+    return NextResponse.json({ error: message, details }, { status: 500 });
   }
 }
