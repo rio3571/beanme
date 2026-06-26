@@ -123,3 +123,39 @@ data/
 3. 텔레그램 봇 알림 (대표 1:1로 새 주문 들어왔다고)
 4. 디자인 다듬기
 5. 토스페이먼츠 결제
+
+---
+
+## B2B 원두 주문 포털 (`/portal`) — 2026-06-26 추가
+
+희연재 원두사업부의 **거래처 전용 B2B 주문 포털**. 기존 설문/소비자 퍼널과 별개 모듈로 `/portal` 하위에 구축.
+
+### 인증/보안 모델
+- **Supabase Auth**(이메일+비번) 로그인. 거래처는 **공개가입 X → 관리자(대표)가 계정 발급**.
+- 데이터 접근은 전부 **서버에서 secret key 클라이언트**(`lib/supabaseAdmin.ts`, env `SUPABASE_SECRET_KEY`)로. b2b_* 테이블은 **RLS on + 정책 없음** → anon/publishable 키로는 접근 불가(서버 전용).
+- `lib/portal.ts`: `getAuthUser`/`getMyAccount` (React `cache()`로 요청당 1회). 페이지에서 role 체크 후 redirect.
+- `src/middleware.ts`: 세션 갱신 + `/portal/*` 보호. **로그인 유지**: 인증 쿠키 maxAge 400일(`lib/supabase.ts` + middleware의 setAll에서 value 있을 때만 연장, 로그아웃 시 정상 삭제).
+- **로그인 아이디 영문 허용**: `lib/loginId.ts` `toAuthEmail` — `@` 없으면 `<id>@beanme.local` 로 변환해 Auth에 저장. `displayLoginId`로 역변환 표시. 기존 이메일 계정도 그대로.
+
+### Supabase 테이블 (포털용)
+- `supabase_b2b_portal.sql`: `b2b_accounts`(거래처/관리자, role buyer|admin), `products`, `account_prices`(아이디별 단가), `b2b_orders`, `b2b_order_items`, `b2b_messages`(일반 1:1 문의)
+- `supabase_order_comments.sql`: `b2b_order_comments`(주문건별 코멘트)
+- `supabase_bank_info.sql`: `b2b_accounts.bank_info` 컬럼 ALTER (거래처별 입금계좌)
+- ⚠️ DDL은 JS로 불가 → **사용자가 Supabase SQL Editor에서 직접 Run** 해야 함. 코드는 `select("*")`/optional 읽기로 컬럼 없어도 안 깨지게 작성.
+
+### 기능
+- 거래처: 내 단가로 주문(`/portal/order`) → 주문내역 월별(`/portal/orders`) → 거래내역서 PDF(`/portal/statement`) → 일반 문의(`/portal/inquiry`) + 주문별 코멘트
+- 관리자: 거래처 발급·아이디별 단가·입금계좌(`/portal/admin`, `/portal/admin/accounts/[id]`) / 전체 주문·상태변경(`/portal/admin/orders`) / 문의(`/portal/admin/messages`) / 거래처별 거래내역서
+- **텔레그램 알림**: 새 주문·문의·주문코멘트 시 대표 1:1로. **기존 비서봇 재사용** (env `TELEGRAM_BOT_TOKEN`=비서봇, `TELEGRAM_OWNER_CHAT_ID`). `lib/telegram.ts`.
+- **거래명세서 PDF**: `components/StatementView.tsx`(jspdf+html2canvas 동적 import, A4 다중페이지) + `lib/statement.ts`(월별 집계). 공급자 정보 `lib/supplier.ts`(주식회사 희연재 184-87-02137 김선규 / 주소 경기도 일산동구 사리현동 265-5 직화커피공장 / NICE2351@NAVER.COM).
+- 비밀번호 변경(`/portal/account`), PC 반응형(max-w-5xl + 다단 grid, 모바일 헤더 메뉴 가로 알약).
+
+### 운영 정보
+- 관리자 계정: `rio3571@gmail.com` (초기 비번은 `scripts/seed_admin.mjs`로 발급/재설정 — 비번값은 .env에도 코드에도 저장 안 함, 별도 관리).
+- 상품 시드: `scripts/seed_products.mjs` → **산·바다·노을·디카페인** (base_price 0, 단가는 거래처별 설정).
+- env(.env.local + Vercel Production/Development): `SUPABASE_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_CHAT_ID` (모두 서버 전용, gitignore됨).
+- **Vercel 함수 리전 `icn1`(서울)** — `vercel.json`. DB와 동일 지역으로 지연 최소화. 무료 Supabase는 idle 시 콜드스타트 → 운영 본격화 시 Pro 권장.
+
+### 미완료 / 다음
+- ⏳ `supabase_bank_info.sql` (입금계좌 컬럼) **사용자 Run 대기** — 실행 전엔 계좌 기능 비활성(코드는 안 깨짐).
+- 3단계: **전자세금계산서 자동발행**(팝빌 등 연동) — 거래명세서는 완료, 세금계산서는 추후.
