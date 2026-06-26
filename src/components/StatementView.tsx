@@ -19,7 +19,7 @@ export type StmtBuyer = {
   phone: string | null;
   business_no: string | null;
   address: string | null;
-  bank_info?: string | null;
+  bank?: string | null;
 } | null;
 
 export default function StatementView({
@@ -222,10 +222,10 @@ export default function StatementView({
             </table>
           </div>
 
-          {buyer?.bank_info && (
+          {buyer?.bank && (
             <div className="mt-5 border border-stone-300 rounded-lg p-3 text-sm">
               <span className="text-amber-700 font-bold">입금계좌 </span>
-              <span className="whitespace-pre-wrap">{buyer.bank_info}</span>
+              <span className="whitespace-pre-wrap">{buyer.bank}</span>
             </div>
           )}
 

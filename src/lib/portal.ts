@@ -11,7 +11,7 @@ export type Account = {
   email: string | null;
   business_no: string | null;
   address: string | null;
-  bank_info: string | null; // 거래처별 입금계좌
+  memo: string | null; // 거래처별 입금계좌 저장용으로 재사용 (별도 컬럼 추가 없이)
   role: string; // 'buyer' | 'admin'
   active: boolean;
 };

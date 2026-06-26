@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { displayLoginId } from "@/lib/loginId";
+import { parseMeta } from "@/lib/acctMeta";
 import PriceForm, { type PriceRow } from "./PriceForm";
 import BankForm from "./BankForm";
+import PasswordResetForm from "./PasswordResetForm";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ type AccountRow = {
   email: string | null;
   business_no: string | null;
   address: string | null;
-  bank_info: string | null;
+  memo: string | null;
 };
 
 export default async function AccountPricePage({
@@ -43,6 +45,7 @@ export default async function AccountPricePage({
     .maybeSingle();
   const account = acctData as AccountRow | null;
   if (!account) redirect("/portal/admin");
+  const meta = parseMeta(account.memo);
 
   const { data: prodData } = await admin
     .from("products")
@@ -77,16 +80,31 @@ export default async function AccountPricePage({
           {account.company_name}
         </h1>
         <p className="text-sm text-stone-500">
-          {[
-            account.email ? `아이디 ${displayLoginId(account.email)}` : null,
-            account.contact_name,
-            account.phone,
-          ]
-            .filter(Boolean)
-            .join(" · ") || "—"}
+          {[account.contact_name, account.phone].filter(Boolean).join(" · ") ||
+            "—"}
         </p>
       </div>
-      <BankForm accountId={account.id} initial={account.bank_info ?? ""} />
+
+      <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
+        <div className="font-semibold text-stone-800 mb-2">로그인 정보</div>
+        <div className="text-sm space-y-1">
+          <div className="flex gap-2">
+            <span className="text-stone-400 w-16">아이디</span>
+            <span className="font-medium text-stone-800 select-all">
+              {displayLoginId(account.email)}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <span className="text-stone-400 w-16">비밀번호</span>
+            <span className="font-medium text-stone-800 select-all">
+              {meta.pw ? meta.pw : "(확인 불가 — 아래에서 재설정하세요)"}
+            </span>
+          </div>
+        </div>
+        <PasswordResetForm accountId={account.id} />
+      </div>
+
+      <BankForm accountId={account.id} initial={meta.bank ?? ""} />
       <a
         href={`/portal/admin/accounts/${account.id}/statement`}
         className="block text-center rounded-xl border border-amber-600 text-amber-700 font-semibold py-2.5 mb-4 hover:bg-amber-50"

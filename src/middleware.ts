@@ -36,6 +36,12 @@ export async function middleware(req: NextRequest) {
 
   const path = req.nextUrl.pathname;
   const isLogin = path === "/portal/login";
+  // 이미 로그인했는데 로그인 페이지로 오면 → 포털 홈으로
+  if (isLogin && user) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/portal";
+    return NextResponse.redirect(url);
+  }
   if (path.startsWith("/portal") && !isLogin && !user) {
     const url = req.nextUrl.clone();
     url.pathname = "/portal/login";

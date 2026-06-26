@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { ym } from "@/lib/format";
+import { parseMeta } from "@/lib/acctMeta";
 import type { StmtRow, StmtBuyer } from "@/components/StatementView";
 
 export type StatementData = {
@@ -61,5 +62,9 @@ export async function loadStatement(
   }
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
-  return { buyer: acct as StmtBuyer, months, selectedYm, rows, total };
+  const bank = parseMeta(
+    (acct as { memo?: string | null } | null)?.memo
+  ).bank;
+  const buyer = (acct ? { ...acct, bank } : null) as StmtBuyer;
+  return { buyer, months, selectedYm, rows, total };
 }

@@ -3,6 +3,7 @@
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { toAuthEmail, validLoginId } from "@/lib/loginId";
+import { parseMeta, stringifyMeta } from "@/lib/acctMeta";
 import { revalidatePath } from "next/cache";
 
 export type CreateAccountState = { error: string | null; ok?: boolean };
@@ -52,6 +53,7 @@ export async function createAccount(
     address: address || null,
     role: "buyer",
     active: true,
+    memo: stringifyMeta({ pw: password }), // 관리자 참고용 비번 저장
   });
   if (insErr) {
     await admin.auth.admin.deleteUser(created.user.id);
@@ -99,11 +101,49 @@ export async function updateAccountBank(
   const me = await getMyAccount();
   if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
   const admin = createAdminClient();
+  const { data: cur } = await admin
+    .from("b2b_accounts")
+    .select("memo")
+    .eq("id", accountId)
+    .maybeSingle();
+  const meta = parseMeta(cur?.memo as string | null | undefined);
+  meta.bank = bankInfo.trim();
   const { error } = await admin
     .from("b2b_accounts")
-    .update({ bank_info: bankInfo.trim() || null })
+    .update({ memo: stringifyMeta(meta) })
     .eq("id", accountId);
   if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
+export async function updateAccountPassword(
+  accountId: string,
+  newPw: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  if (newPw.length < 6) return { ok: false, error: "비밀번호는 6자 이상이어야 해요." };
+  const admin = createAdminClient();
+  const { data: acct } = await admin
+    .from("b2b_accounts")
+    .select("auth_user_id, memo")
+    .eq("id", accountId)
+    .maybeSingle();
+  if (!acct?.auth_user_id) return { ok: false, error: "계정을 찾을 수 없어요." };
+
+  const { error: pwErr } = await admin.auth.admin.updateUserById(
+    acct.auth_user_id as string,
+    { password: newPw }
+  );
+  if (pwErr) return { ok: false, error: "변경 실패: " + pwErr.message };
+
+  const meta = parseMeta(acct.memo as string | null | undefined);
+  meta.pw = newPw;
+  await admin
+    .from("b2b_accounts")
+    .update({ memo: stringifyMeta(meta) })
+    .eq("id", accountId);
   revalidatePath(`/portal/admin/accounts/${accountId}`);
   return { ok: true };
 }
