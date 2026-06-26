@@ -3,6 +3,8 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { won, kst } from "@/lib/format";
 import StatusSelect from "./StatusSelect";
+import OrderComments from "@/components/OrderComments";
+import type { CommentRow } from "@/app/portal/comments";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,22 @@ export default async function AdminOrdersPage() {
     byOrder.set(it.order_id, arr);
   }
 
+  let comments: (CommentRow & { order_id: string })[] = [];
+  if (ids.length > 0) {
+    const { data: cData } = await admin
+      .from("b2b_order_comments")
+      .select("id, order_id, sender, body, created_at")
+      .in("order_id", ids)
+      .order("created_at", { ascending: true });
+    comments = (cData ?? []) as (CommentRow & { order_id: string })[];
+  }
+  const cByOrder = new Map<string, CommentRow[]>();
+  for (const c of comments) {
+    const arr = cByOrder.get(c.order_id) ?? [];
+    arr.push({ id: c.id, sender: c.sender, body: c.body, created_at: c.created_at });
+    cByOrder.set(c.order_id, arr);
+  }
+
   return (
     <div>
       <h1 className="text-lg font-bold text-stone-800 mb-4">전체 주문</h1>
@@ -102,6 +120,11 @@ export default async function AdminOrdersPage() {
               <div className="flex justify-end mt-2 font-bold text-stone-800">
                 {won(o.total_amount)}
               </div>
+              <OrderComments
+                orderId={o.id}
+                role="admin"
+                initial={cByOrder.get(o.id) ?? []}
+              />
             </div>
           ))}
         </div>

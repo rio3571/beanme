@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
@@ -25,17 +26,17 @@ export type Product = {
   sort_order: number;
 };
 
-/** 로그인된 Supabase Auth 사용자 (없으면 null) */
-export async function getAuthUser() {
+/** 로그인된 Supabase Auth 사용자 (요청당 1회 캐시) */
+export const getAuthUser = cache(async () => {
   const sb = await createClient();
   const {
     data: { user },
   } = await sb.auth.getUser();
   return user ?? null;
-}
+});
 
-/** 로그인 사용자의 거래처 계정 정보 (없으면 null) */
-export async function getMyAccount(): Promise<Account | null> {
+/** 로그인 사용자의 거래처 계정 (요청당 1회 캐시 — 레이아웃+페이지 중복 조회 방지) */
+export const getMyAccount = cache(async (): Promise<Account | null> => {
   const user = await getAuthUser();
   if (!user) return null;
   const admin = createAdminClient();
@@ -45,4 +46,4 @@ export async function getMyAccount(): Promise<Account | null> {
     .eq("auth_user_id", user.id)
     .maybeSingle();
   return (data as Account) ?? null;
-}
+});
