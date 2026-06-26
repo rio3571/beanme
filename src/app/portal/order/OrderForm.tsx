@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createOrder } from "./actions";
+import { createOrder, editOrder } from "./actions";
 import { won } from "@/lib/format";
 
 export type OrderItem = {
@@ -12,9 +12,19 @@ export type OrderItem = {
   price: number;
 };
 
-export default function OrderForm({ items }: { items: OrderItem[] }) {
-  const [qty, setQty] = useState<Record<string, number>>({});
-  const [note, setNote] = useState("");
+export default function OrderForm({
+  items,
+  orderId,
+  initialQty,
+  initialNote,
+}: {
+  items: OrderItem[];
+  orderId?: string;
+  initialQty?: Record<string, number>;
+  initialNote?: string;
+}) {
+  const [qty, setQty] = useState<Record<string, number>>(initialQty ?? {});
+  const [note, setNote] = useState(initialNote ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -36,7 +46,9 @@ export default function OrderForm({ items }: { items: OrderItem[] }) {
       return;
     }
     setSubmitting(true);
-    const res = await createOrder({ items: chosen, note });
+    const res = orderId
+      ? await editOrder(orderId, { items: chosen, note })
+      : await createOrder({ items: chosen, note });
     setSubmitting(false);
     if (res.ok) {
       setDone(res.orderNo ?? "");
@@ -51,17 +63,19 @@ export default function OrderForm({ items }: { items: OrderItem[] }) {
     return (
       <div className="text-center py-12">
         <div className="text-5xl mb-4">✅</div>
-        <h2 className="text-xl font-bold text-stone-800">주문이 접수됐어요</h2>
+        <h2 className="text-xl font-bold text-stone-800">
+          {orderId ? "주문이 수정됐어요" : "주문이 접수됐어요"}
+        </h2>
         <p className="text-stone-500 mt-2">주문번호 {done}</p>
         <p className="text-sm text-stone-400 mt-1">
-          확인 후 연락드릴게요. 주문내역에서 진행 상태를 볼 수 있어요.
+          주문내역에서 확인할 수 있어요.
         </p>
-        <button
-          onClick={() => setDone(null)}
-          className="mt-6 rounded-xl bg-amber-700 text-white font-semibold px-6 py-3 hover:bg-amber-800"
+        <a
+          href="/portal/orders"
+          className="inline-block mt-6 rounded-xl bg-amber-700 text-white font-semibold px-6 py-3 hover:bg-amber-800"
         >
-          새 주문하기
-        </button>
+          주문내역으로
+        </a>
       </div>
     );
   }
@@ -167,7 +181,7 @@ export default function OrderForm({ items }: { items: OrderItem[] }) {
             disabled={submitting || total <= 0}
             className="rounded-xl bg-amber-700 text-white font-semibold px-7 py-3 hover:bg-amber-800 disabled:opacity-40"
           >
-            {submitting ? "접수 중…" : "주문하기"}
+            {submitting ? "저장 중…" : orderId ? "수정 저장" : "주문하기"}
           </button>
         </div>
       </div>

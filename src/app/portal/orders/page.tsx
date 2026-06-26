@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { won, kst, ym, ymLabel, STATUS_LABEL } from "@/lib/format";
 import { parseMeta } from "@/lib/acctMeta";
 import OrderComments from "@/components/OrderComments";
+import DeleteOrderButton from "@/components/DeleteOrderButton";
 import type { CommentRow } from "@/app/portal/comments";
 
 export const dynamic = "force-dynamic";
@@ -83,13 +84,26 @@ export default async function OrdersPage() {
     gmap.get(key)!.push(o);
   }
 
-  const renderCard = (o: OrderRow) => (
+  const renderCard = (o: OrderRow) => {
+    const editable = o.status !== "done" && o.status !== "canceled";
+    return (
     <div key={o.id} className="bg-white rounded-xl border border-stone-200 p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-stone-700">{o.order_no}</span>
-        <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700">
-          {STATUS_LABEL[o.status] ?? o.status}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700">
+            {STATUS_LABEL[o.status] ?? o.status}
+          </span>
+          {editable && (
+            <Link
+              href={`/portal/order/${o.id}/edit`}
+              className="text-xs text-stone-400 hover:text-amber-700 px-1"
+            >
+              수정
+            </Link>
+          )}
+          {editable && <DeleteOrderButton orderId={o.id} label="취소" />}
+        </div>
       </div>
       <div className="text-xs text-stone-400 mt-0.5">{kst(o.created_at)}</div>
       <div className="mt-2 border-t border-stone-100 pt-2 space-y-0.5">
@@ -113,7 +127,8 @@ export default async function OrdersPage() {
         initial={cByOrder.get(o.id) ?? []}
       />
     </div>
-  );
+    );
+  };
 
   return (
     <div>

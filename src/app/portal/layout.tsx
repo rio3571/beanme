@@ -16,9 +16,9 @@ export default async function PortalLayout({
   const nav = isAdmin
     ? [
         { href: "/portal/admin", label: "대시보드" },
-        { href: "/portal/admin/accounts", label: "거래처" },
         { href: "/portal/admin/orders", label: "주문" },
         { href: "/portal/admin/messages", label: "문의" },
+        { href: "/portal/admin/accounts", label: "거래처 관리" },
       ]
     : [
         { href: "/portal", label: "홈" },
