@@ -77,8 +77,8 @@ export default function StatementView({
     SUPPLIER.bizNo && `사업자번호 ${SUPPLIER.bizNo}`,
     SUPPLIER.ceo && `대표 ${SUPPLIER.ceo}`,
     SUPPLIER.tel && `Tel ${SUPPLIER.tel}`,
-    SUPPLIER.address,
-    SUPPLIER.email && `이메일 ${SUPPLIER.email}`,
+    SUPPLIER.address && `주소 : ${SUPPLIER.address}`,
+    SUPPLIER.email && `email : ${SUPPLIER.email}`,
   ].filter(Boolean) as string[];
 
   const buyerLines = [
