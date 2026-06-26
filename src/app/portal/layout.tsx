@@ -41,11 +41,19 @@ export default async function PortalLayout({
               </Link>
             ))}
           </nav>
-          <form action={signOutAction} className="ml-auto">
-            <button className="text-sm text-stone-400 hover:text-stone-700 px-2 py-1">
-              로그아웃
-            </button>
-          </form>
+          <div className="ml-auto flex items-center gap-1">
+            <Link
+              href="/portal/account"
+              className="text-sm text-stone-400 hover:text-stone-700 px-2 py-1"
+            >
+              비밀번호
+            </Link>
+            <form action={signOutAction}>
+              <button className="text-sm text-stone-400 hover:text-stone-700 px-2 py-1">
+                로그아웃
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-5">{children}</main>
