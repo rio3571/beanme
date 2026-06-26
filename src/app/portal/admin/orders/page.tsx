@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { won, kst } from "@/lib/format";
+import { won, kst, ym, ymLabel } from "@/lib/format";
 import StatusSelect from "./StatusSelect";
 import OrderComments from "@/components/OrderComments";
 import type { CommentRow } from "@/app/portal/comments";
@@ -77,54 +77,65 @@ export default async function AdminOrdersPage() {
     cByOrder.set(c.order_id, arr);
   }
 
+  // 월별 그룹
+  const groups: { ym: string; orders: OrderRow[] }[] = [];
+  const gmap = new Map<string, OrderRow[]>();
+  for (const o of orders) {
+    const key = ym(o.created_at);
+    if (!gmap.has(key)) {
+      gmap.set(key, []);
+      groups.push({ ym: key, orders: gmap.get(key)! });
+    }
+    gmap.get(key)!.push(o);
+  }
+
+  const renderCard = (o: OrderRow) => (
+    <div key={o.id} className="bg-white rounded-xl border border-stone-200 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-semibold text-stone-800 truncate">
+            {nameMap.get(o.account_id) ?? "—"}
+          </div>
+          <div className="text-xs text-stone-400">
+            {o.order_no} · {kst(o.created_at)}
+          </div>
+        </div>
+        <StatusSelect orderId={o.id} initial={o.status} />
+      </div>
+      <div className="mt-2 border-t border-stone-100 pt-2 space-y-0.5">
+        {(byOrder.get(o.id) ?? []).map((it, i) => (
+          <div key={i} className="flex justify-between text-sm text-stone-600">
+            <span>
+              {it.product_name} {it.qty}
+              {it.unit}
+            </span>
+            <span>{won(it.line_amount)}</span>
+          </div>
+        ))}
+      </div>
+      {o.note && <div className="text-xs text-stone-400 mt-2">요청: {o.note}</div>}
+      <div className="flex justify-end mt-2 font-bold text-stone-800">
+        {won(o.total_amount)}
+      </div>
+      <OrderComments
+        orderId={o.id}
+        role="admin"
+        initial={cByOrder.get(o.id) ?? []}
+      />
+    </div>
+  );
+
   return (
     <div>
       <h1 className="text-lg font-bold text-stone-800 mb-4">전체 주문</h1>
       {orders.length === 0 ? (
         <p className="text-stone-400 text-center py-16">아직 주문이 없어요.</p>
       ) : (
-        <div className="space-y-3">
-          {orders.map((o) => (
-            <div
-              key={o.id}
-              className="bg-white rounded-xl border border-stone-200 p-4"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-stone-800 truncate">
-                    {nameMap.get(o.account_id) ?? "—"}
-                  </div>
-                  <div className="text-xs text-stone-400">
-                    {o.order_no} · {kst(o.created_at)}
-                  </div>
-                </div>
-                <StatusSelect orderId={o.id} initial={o.status} />
-              </div>
-              <div className="mt-2 border-t border-stone-100 pt-2 space-y-0.5">
-                {(byOrder.get(o.id) ?? []).map((it, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between text-sm text-stone-600"
-                  >
-                    <span>
-                      {it.product_name} {it.qty}
-                      {it.unit}
-                    </span>
-                    <span>{won(it.line_amount)}</span>
-                  </div>
-                ))}
-              </div>
-              {o.note && (
-                <div className="text-xs text-stone-400 mt-2">요청: {o.note}</div>
-              )}
-              <div className="flex justify-end mt-2 font-bold text-stone-800">
-                {won(o.total_amount)}
-              </div>
-              <OrderComments
-                orderId={o.id}
-                role="admin"
-                initial={cByOrder.get(o.id) ?? []}
-              />
+        <div className="space-y-6">
+          {groups.map((g) => (
+            <div key={g.ym}>
+              <h2 className="font-bold text-stone-700 mb-2">{ymLabel(g.ym)}</h2>
+              <div className="space-y-3">{g.orders.map(renderCard)}</div>
             </div>
           ))}
         </div>

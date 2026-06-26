@@ -79,6 +79,12 @@ export default async function AccountPricePage({
             .join(" · ") || "—"}
         </p>
       </div>
+      <a
+        href={`/portal/admin/accounts/${account.id}/statement`}
+        className="block text-center rounded-xl border border-amber-600 text-amber-700 font-semibold py-2.5 mb-4 hover:bg-amber-50"
+      >
+        📄 거래내역서 (월별) · PDF 다운로드
+      </a>
       <PriceForm accountId={account.id} rows={rows} />
     </div>
   );

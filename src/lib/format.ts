@@ -20,3 +20,27 @@ export const STATUS_LABEL: Record<string, string> = {
   done: "완료",
   canceled: "취소",
 };
+
+/** UTC 타임스탬프 → KST 기준 'YYYY-MM' */
+export function ym(ts: string | null | undefined): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const k = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return `${k.getUTCFullYear()}-${String(k.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** 'YYYY-MM' → 'YYYY년 M월' */
+export function ymLabel(yms: string): string {
+  const [y, m] = (yms || "").split("-");
+  if (!y || !m) return yms;
+  return `${y}년 ${Number(m)}월`;
+}
+
+/** UTC → KST 'YYYY.MM.DD' (시간 없이) */
+export function kstDate(ts: string | null | undefined): string {
+  if (!ts) return "-";
+  const d = new Date(ts);
+  const k = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${k.getUTCFullYear()}.${p(k.getUTCMonth() + 1)}.${p(k.getUTCDate())}`;
+}
