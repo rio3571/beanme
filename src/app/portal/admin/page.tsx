@@ -2,64 +2,142 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import AccountCreateForm from "./AccountCreateForm";
+import { won, ym, ymLabel } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-type AccountRow = {
-  id: string;
-  company_name: string;
-  contact_name: string | null;
-  phone: string | null;
-  active: boolean;
-};
-
-export default async function AdminAccountsPage() {
+export default async function AdminDashboard() {
   const me = await getMyAccount();
   if (!me) redirect("/portal/login");
   if (me.role !== "admin") redirect("/portal/order");
 
   const admin = createAdminClient();
-  const { data } = await admin
+  const thisYm = ym(new Date().toISOString());
+
+  const { data: orderData } = await admin
+    .from("b2b_orders")
+    .select("id, total_amount, created_at, status");
+  const orders = (orderData ?? []) as {
+    id: string;
+    total_amount: number;
+    created_at: string;
+    status: string;
+  }[];
+  const monthOrders = orders.filter((o) => ym(o.created_at) === thisYm);
+  const monthCount = monthOrders.length;
+  const monthSales = monthOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
+  const pendingCount = orders.filter((o) => o.status === "requested").length;
+
+  const monthIds = monthOrders.map((o) => o.id);
+  const qtyMap = new Map<string, number>();
+  if (monthIds.length > 0) {
+    const { data: itemData } = await admin
+      .from("b2b_order_items")
+      .select("order_id, product_name, qty")
+      .in("order_id", monthIds);
+    for (const it of itemData ?? []) {
+      const name = it.product_name as string;
+      qtyMap.set(name, (qtyMap.get(name) ?? 0) + ((it.qty as number) ?? 0));
+    }
+  }
+
+  const { data: prodData } = await admin
+    .from("products")
+    .select("name")
+    .eq("active", true)
+    .order("sort_order");
+  const products = (prodData ?? []).map((p) => p.name as string);
+  const monthTotalQty = [...qtyMap.values()].reduce((s, v) => s + v, 0);
+
+  const { data: msgData } = await admin
+    .from("b2b_messages")
+    .select("sender, read_by_admin");
+  const unread = (msgData ?? []).filter(
+    (m) => m.sender === "buyer" && !m.read_by_admin
+  ).length;
+
+  const { data: acctData } = await admin
     .from("b2b_accounts")
-    .select("id, company_name, contact_name, phone, active")
-    .eq("role", "buyer")
-    .order("created_at", { ascending: false });
-  const accounts = (data ?? []) as AccountRow[];
+    .select("id")
+    .eq("role", "buyer");
+  const acctCount = (acctData ?? []).length;
+
+  const metric = (label: string, value: string, sub?: string) => (
+    <div className="bg-white rounded-xl border border-stone-200 p-4">
+      <div className="text-xs text-stone-400 font-medium">{label}</div>
+      <div className="text-2xl font-bold text-stone-800 mt-1 leading-tight">
+        {value}
+      </div>
+      {sub && <div className="text-xs text-stone-400 mt-0.5">{sub}</div>}
+    </div>
+  );
 
   return (
     <div>
-      <h1 className="text-lg font-bold text-stone-800 mb-4">거래처 관리</h1>
-
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mb-4">
-        {accounts.length === 0 && (
-          <p className="text-stone-400 text-center py-8 text-sm sm:col-span-2 lg:col-span-3">
-            아직 발급된 거래처가 없어요. 아래에서 추가하세요.
-          </p>
-        )}
-        {accounts.map((a) => (
-          <Link
-            key={a.id}
-            href={`/portal/admin/accounts/${a.id}`}
-            className="block bg-white rounded-xl border border-stone-200 p-4 hover:border-amber-500"
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-stone-800">
-                {a.company_name}
-              </span>
-              <span className="text-xs text-amber-700">단가 설정 ›</span>
-            </div>
-            <div className="text-sm text-stone-500 mt-0.5">
-              {[a.contact_name, a.phone].filter(Boolean).join(" · ") || "—"}
-              {!a.active && (
-                <span className="ml-2 text-red-500">(비활성)</span>
-              )}
-            </div>
-          </Link>
-        ))}
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="text-lg font-bold text-stone-800">대시보드</h1>
+        <span className="text-sm text-stone-400">{ymLabel(thisYm)} 기준</span>
       </div>
 
-      <AccountCreateForm />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-3">
+        {metric("이번 달 주문", `${monthCount}건`)}
+        {metric("이번 달 매출", won(monthSales), "VAT 별도")}
+        <Link href="/portal/admin/orders" className="contents">
+          {metric("처리 대기", `${pendingCount}건`, "접수 상태")}
+        </Link>
+        <Link href="/portal/admin/messages" className="contents">
+          {metric("안 읽은 문의", `${unread}건`, unread > 0 ? "확인 필요" : "—")}
+        </Link>
+      </div>
+
+      <div className="bg-white rounded-xl border border-stone-200 p-4 mb-3">
+        <div className="flex items-baseline justify-between mb-3">
+          <span className="font-semibold text-stone-800">상품별 주문 수량</span>
+          <span className="text-xs text-stone-400">
+            이번 달 합계 {monthTotalQty}kg
+          </span>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {products.map((name) => (
+            <div
+              key={name}
+              className="bg-stone-50 rounded-lg border border-stone-200 px-3 py-2.5"
+            >
+              <div className="text-sm text-stone-500">{name}</div>
+              <div className="text-xl font-bold text-stone-800">
+                {qtyMap.get(name) ?? 0}
+                <span className="text-sm font-medium text-stone-400">kg</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2.5">
+        <Link
+          href="/portal/admin/accounts"
+          className="bg-white rounded-xl border border-stone-200 p-4 text-center hover:border-amber-500"
+        >
+          <div className="font-semibold text-stone-800">거래처</div>
+          <div className="text-xs text-stone-400 mt-0.5">{acctCount}개</div>
+        </Link>
+        <Link
+          href="/portal/admin/orders"
+          className="bg-white rounded-xl border border-stone-200 p-4 text-center hover:border-amber-500"
+        >
+          <div className="font-semibold text-stone-800">전체 주문</div>
+          <div className="text-xs text-stone-400 mt-0.5">누적 {orders.length}건</div>
+        </Link>
+        <Link
+          href="/portal/admin/messages"
+          className="bg-white rounded-xl border border-stone-200 p-4 text-center hover:border-amber-500"
+        >
+          <div className="font-semibold text-stone-800">문의</div>
+          <div className="text-xs text-stone-400 mt-0.5">
+            {unread > 0 ? `안읽음 ${unread}` : "관리"}
+          </div>
+        </Link>
+      </div>
     </div>
   );
 }

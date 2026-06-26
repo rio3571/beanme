@@ -15,11 +15,13 @@ export default async function PortalLayout({
   const isAdmin = account.role === "admin";
   const nav = isAdmin
     ? [
-        { href: "/portal/admin", label: "거래처" },
+        { href: "/portal/admin", label: "대시보드" },
+        { href: "/portal/admin/accounts", label: "거래처" },
         { href: "/portal/admin/orders", label: "주문" },
         { href: "/portal/admin/messages", label: "문의" },
       ]
     : [
+        { href: "/portal", label: "홈" },
         { href: "/portal/orders", label: "주문내역" },
         { href: "/portal/order", label: "주문하기" },
         { href: "/portal/inquiry", label: "문의" },

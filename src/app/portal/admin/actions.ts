@@ -60,7 +60,7 @@ export async function createAccount(
     return { error: "거래처 저장 실패: " + insErr.message };
   }
 
-  revalidatePath("/portal/admin");
+  revalidatePath("/portal/admin/accounts");
   return { error: null, ok: true };
 }
 

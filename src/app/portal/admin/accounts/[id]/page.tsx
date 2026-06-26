@@ -73,7 +73,7 @@ export default async function AccountPricePage({
   return (
     <div>
       <div className="mb-4">
-        <a href="/portal/admin" className="text-sm text-stone-400">
+        <a href="/portal/admin/accounts" className="text-sm text-stone-400">
           ‹ 거래처 목록
         </a>
         <h1 className="text-lg font-bold text-stone-800 mt-1">
