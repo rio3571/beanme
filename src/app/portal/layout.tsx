@@ -17,10 +17,12 @@ export default async function PortalLayout({
     ? [
         { href: "/portal/admin", label: "거래처" },
         { href: "/portal/admin/orders", label: "주문" },
+        { href: "/portal/admin/messages", label: "문의" },
       ]
     : [
         { href: "/portal/order", label: "주문하기" },
         { href: "/portal/orders", label: "주문내역" },
+        { href: "/portal/inquiry", label: "문의" },
       ];
 
   return (

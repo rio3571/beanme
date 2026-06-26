@@ -20,6 +20,9 @@ export default supabase;
  *   import { createClient } from "@/lib/supabase";
  *   const sb = await createClient();
  */
+// 로그인 유지: 인증 쿠키를 길게(약 400일) 유지. 단, 로그아웃(value 비움) 시엔 그대로 삭제되게.
+const KEEP_MAX_AGE = 60 * 60 * 24 * 400;
+
 export async function createClient() {
   const cookieStore = await cookies();
   return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -30,7 +33,10 @@ export async function createClient() {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            cookieStore.set(name, value, {
+              ...options,
+              maxAge: value ? KEEP_MAX_AGE : options?.maxAge,
+            })
           );
         } catch {
           // Server Component에서는 set 불가 — 무시
