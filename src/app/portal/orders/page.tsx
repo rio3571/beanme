@@ -117,6 +117,14 @@ export default async function OrdersPage() {
   return (
     <div>
       <h1 className="text-lg font-bold text-stone-800 mb-4">주문내역</h1>
+      {account.bank_info && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-4 text-sm">
+          <span className="font-semibold text-amber-800">입금계좌 </span>
+          <span className="text-stone-700 whitespace-pre-wrap">
+            {account.bank_info}
+          </span>
+        </div>
+      )}
       {orders.length === 0 ? (
         <p className="text-stone-400 text-center py-16">아직 주문 내역이 없어요.</p>
       ) : (

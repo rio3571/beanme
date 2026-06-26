@@ -2,6 +2,7 @@
 
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { toAuthEmail, validLoginId } from "@/lib/loginId";
 import { revalidatePath } from "next/cache";
 
 export type CreateAccountState = { error: string | null; ok?: boolean };
@@ -13,7 +14,7 @@ export async function createAccount(
   const me = await getMyAccount();
   if (!me || me.role !== "admin") return { error: "권한이 없습니다." };
 
-  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const loginId = String(formData.get("loginId") || "").trim();
   const password = String(formData.get("password") || "");
   const company = String(formData.get("company") || "").trim();
   const contact = String(formData.get("contact") || "").trim();
@@ -21,10 +22,15 @@ export async function createAccount(
   const business = String(formData.get("business") || "").trim();
   const address = String(formData.get("address") || "").trim();
 
-  if (!email || !password || !company) {
-    return { error: "이메일·비밀번호·상호는 필수입니다." };
+  if (!loginId || !password || !company) {
+    return { error: "아이디·비밀번호·상호는 필수입니다." };
+  }
+  if (!validLoginId(loginId)) {
+    return { error: "아이디는 영문/숫자(. _ - 가능) 또는 이메일 형식이어야 해요." };
   }
   if (password.length < 6) return { error: "비밀번호는 6자 이상이어야 해요." };
+
+  const email = toAuthEmail(loginId);
 
   const admin = createAdminClient();
   const { data: created, error } = await admin.auth.admin.createUser({
@@ -82,6 +88,22 @@ export async function setPrices(
       );
     }
   }
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
+export async function updateAccountBank(
+  accountId: string,
+  bankInfo: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ bank_info: bankInfo.trim() || null })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
   revalidatePath(`/portal/admin/accounts/${accountId}`);
   return { ok: true };
 }

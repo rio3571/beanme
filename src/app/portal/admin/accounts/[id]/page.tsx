@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { displayLoginId } from "@/lib/loginId";
 import PriceForm, { type PriceRow } from "./PriceForm";
+import BankForm from "./BankForm";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,7 @@ type AccountRow = {
   email: string | null;
   business_no: string | null;
   address: string | null;
+  bank_info: string | null;
 };
 
 export default async function AccountPricePage({
@@ -35,7 +38,7 @@ export default async function AccountPricePage({
   const admin = createAdminClient();
   const { data: acctData } = await admin
     .from("b2b_accounts")
-    .select("id, company_name, contact_name, phone, email, business_no, address")
+    .select("*")
     .eq("id", id)
     .maybeSingle();
   const account = acctData as AccountRow | null;
@@ -74,11 +77,16 @@ export default async function AccountPricePage({
           {account.company_name}
         </h1>
         <p className="text-sm text-stone-500">
-          {[account.contact_name, account.phone, account.email]
+          {[
+            account.email ? `아이디 ${displayLoginId(account.email)}` : null,
+            account.contact_name,
+            account.phone,
+          ]
             .filter(Boolean)
             .join(" · ") || "—"}
         </p>
       </div>
+      <BankForm accountId={account.id} initial={account.bank_info ?? ""} />
       <a
         href={`/portal/admin/accounts/${account.id}/statement`}
         className="block text-center rounded-xl border border-amber-600 text-amber-700 font-semibold py-2.5 mb-4 hover:bg-amber-50"

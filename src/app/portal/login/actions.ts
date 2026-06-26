@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { toAuthEmail } from "@/lib/loginId";
 import { redirect } from "next/navigation";
 
 export type LoginState = { error: string | null };
@@ -10,10 +11,11 @@ export async function loginAction(
   _prev: LoginState,
   formData: FormData
 ): Promise<LoginState> {
-  const email = String(formData.get("email") || "").trim();
+  const loginId = String(formData.get("loginId") || "").trim();
   const password = String(formData.get("password") || "");
-  if (!email || !password) return { error: "이메일과 비밀번호를 입력하세요." };
+  if (!loginId || !password) return { error: "아이디와 비밀번호를 입력하세요." };
 
+  const email = toAuthEmail(loginId);
   const sb = await createClient();
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error || !data.user) {

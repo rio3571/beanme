@@ -18,7 +18,7 @@ export async function loadStatement(
 
   const { data: acct } = await admin
     .from("b2b_accounts")
-    .select("company_name, contact_name, phone, business_no, address")
+    .select("*")
     .eq("id", accountId)
     .maybeSingle();
 

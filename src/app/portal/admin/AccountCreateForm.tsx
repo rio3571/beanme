@@ -47,9 +47,11 @@ export default function AccountCreateForm() {
         로그인 정보 (거래처에 전달)
       </div>
       <input
-        name="email"
-        type="email"
-        placeholder="로그인 아이디(이메일) (필수)"
+        name="loginId"
+        type="text"
+        autoCapitalize="none"
+        autoCorrect="off"
+        placeholder="로그인 아이디 — 영문/숫자 또는 이메일 (필수)"
         required
         className={inputCls}
       />

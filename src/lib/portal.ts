@@ -11,6 +11,7 @@ export type Account = {
   email: string | null;
   business_no: string | null;
   address: string | null;
+  bank_info: string | null; // 거래처별 입금계좌
   role: string; // 'buyer' | 'admin'
   active: boolean;
 };

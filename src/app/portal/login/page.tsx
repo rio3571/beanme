@@ -21,15 +21,17 @@ export default function LoginPage() {
         >
           <div>
             <label className="block text-sm font-medium text-stone-600 mb-1.5">
-              아이디 (이메일)
+              아이디
             </label>
             <input
-              name="email"
-              type="email"
+              name="loginId"
+              type="text"
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
               required
               className="w-full rounded-xl border border-stone-300 px-4 py-3 text-stone-800 outline-none focus:border-amber-600"
-              placeholder="example@email.com"
+              placeholder="아이디 또는 이메일"
             />
           </div>
           <div>

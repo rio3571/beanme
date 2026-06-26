@@ -42,5 +42,17 @@ export default async function OrderPage() {
     price: priceMap.get(p.id) ?? p.base_price,
   }));
 
-  return <OrderForm items={items} />;
+  return (
+    <>
+      {account.bank_info && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-4 text-sm">
+          <span className="font-semibold text-amber-800">입금계좌 </span>
+          <span className="text-stone-700 whitespace-pre-wrap">
+            {account.bank_info}
+          </span>
+        </div>
+      )}
+      <OrderForm items={items} />
+    </>
+  );
 }
