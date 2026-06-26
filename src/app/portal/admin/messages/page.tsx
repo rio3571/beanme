@@ -43,6 +43,10 @@ export default async function AdminMessagesPage() {
   }
 
   const sorted = [...accounts].sort((a, b) => {
+    // 안 읽은 새 문의 먼저, 그 다음 최신 메시지 순
+    const ua = (unread.get(a.id) ?? 0) > 0 ? 1 : 0;
+    const ub = (unread.get(b.id) ?? 0) > 0 ? 1 : 0;
+    if (ua !== ub) return ub - ua;
     const ta = last.get(a.id)?.created_at ?? "";
     const tb = last.get(b.id)?.created_at ?? "";
     return tb.localeCompare(ta);

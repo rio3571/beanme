@@ -14,10 +14,10 @@ const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
 });
 
 const products = [
-  { name: "산", category: "blend", unit: "1kg", base_price: 0, sort_order: 1 },
-  { name: "바다", category: "blend", unit: "1kg", base_price: 0, sort_order: 2 },
-  { name: "노을", category: "blend", unit: "1kg", base_price: 0, sort_order: 3 },
-  { name: "디카페인", category: "blend", unit: "1kg", base_price: 0, sort_order: 4 },
+  { name: "산", category: "blend", unit: "kg", base_price: 0, sort_order: 1 },
+  { name: "바다", category: "blend", unit: "kg", base_price: 0, sort_order: 2 },
+  { name: "노을", category: "blend", unit: "kg", base_price: 0, sort_order: 3 },
+  { name: "디카페인", category: "blend", unit: "kg", base_price: 0, sort_order: 4 },
 ];
 
 async function main() {

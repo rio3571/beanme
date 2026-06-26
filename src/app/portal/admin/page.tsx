@@ -62,9 +62,14 @@ export default async function AdminDashboard() {
     .eq("role", "buyer");
   const acctCount = (acctData ?? []).length;
 
-  const metric = (label: string, value: string, sub?: string) => (
-    <div className="bg-white rounded-xl border border-stone-200 p-4">
-      <div className="text-xs text-stone-400 font-medium">{label}</div>
+  const metric = (
+    label: string,
+    value: string,
+    sub?: string,
+    tone = "bg-white border-stone-200"
+  ) => (
+    <div className={`rounded-xl border p-4 ${tone}`}>
+      <div className="text-xs text-stone-500 font-medium">{label}</div>
       <div className="text-2xl font-bold text-stone-800 mt-1 leading-tight">
         {value}
       </div>
@@ -80,13 +85,18 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-3">
-        {metric("이번 달 주문", `${monthCount}건`)}
-        {metric("이번 달 매출", won(monthSales), "VAT 별도")}
+        {metric("이번 달 주문", `${monthCount}건`, undefined, "bg-amber-50 border-amber-100")}
+        {metric("이번 달 매출", won(monthSales), "VAT 별도", "bg-emerald-50 border-emerald-100")}
         <Link href="/portal/admin/orders" className="contents">
-          {metric("처리 대기", `${pendingCount}건`, "접수 상태")}
+          {metric("처리 대기", `${pendingCount}건`, "접수 상태", "bg-orange-50 border-orange-100")}
         </Link>
         <Link href="/portal/admin/messages" className="contents">
-          {metric("안 읽은 문의", `${unread}건`, unread > 0 ? "확인 필요" : "—")}
+          {metric(
+            "안 읽은 문의",
+            `${unread}건`,
+            unread > 0 ? "확인 필요" : "—",
+            unread > 0 ? "bg-rose-50 border-rose-200" : "bg-sky-50 border-sky-100"
+          )}
         </Link>
       </div>
 
@@ -101,7 +111,7 @@ export default async function AdminDashboard() {
           {products.map((name) => (
             <div
               key={name}
-              className="bg-stone-50 rounded-lg border border-stone-200 px-3 py-2.5"
+              className="bg-amber-50 rounded-lg border border-amber-100 px-3 py-2.5"
             >
               <div className="text-sm text-stone-500">{name}</div>
               <div className="text-xl font-bold text-stone-800">
