@@ -31,9 +31,9 @@ export default async function AdminAccountsPage() {
     <div>
       <h1 className="text-lg font-bold text-stone-800 mb-4">거래처 관리</h1>
 
-      <div className="space-y-2 mb-4">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mb-4">
         {accounts.length === 0 && (
-          <p className="text-stone-400 text-center py-8 text-sm">
+          <p className="text-stone-400 text-center py-8 text-sm sm:col-span-2 lg:col-span-3">
             아직 발급된 거래처가 없어요. 아래에서 추가하세요.
           </p>
         )}

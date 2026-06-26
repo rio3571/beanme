@@ -56,7 +56,7 @@ export default async function AdminMessagesPage() {
           발급된 거래처가 없어요.
         </p>
       ) : (
-        <div className="space-y-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 items-start">
           {sorted.map((a) => {
             const lm = last.get(a.id);
             const u = unread.get(a.id) ?? 0;

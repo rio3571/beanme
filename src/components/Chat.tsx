@@ -35,7 +35,7 @@ export default function Chat({
   }
 
   return (
-    <div className="pb-20">
+    <div className="pb-20 max-w-2xl mx-auto">
       <div className="space-y-2">
         {list.length === 0 && (
           <p className="text-center text-stone-400 text-sm py-12">

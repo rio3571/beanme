@@ -28,7 +28,7 @@ export default async function PortalLayout({
   return (
     <div className="min-h-screen flex flex-col bg-stone-100">
       <header className="sticky top-0 z-20 bg-white border-b border-stone-200">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
           <span className="font-bold text-stone-800 truncate">
             {isAdmin ? "관리자" : account.company_name}
           </span>
@@ -58,7 +58,9 @@ export default async function PortalLayout({
           </div>
         </div>
       </header>
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-5">{children}</main>
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-7">
+        {children}
+      </main>
     </div>
   );
 }

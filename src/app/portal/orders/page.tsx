@@ -132,7 +132,9 @@ export default async function OrdersPage() {
                   📄 거래내역서
                 </Link>
               </div>
-              <div className="space-y-3">{g.orders.map(renderCard)}</div>
+              <div className="grid gap-3 sm:grid-cols-2 items-start">
+                {g.orders.map(renderCard)}
+              </div>
             </div>
           ))}
         </div>

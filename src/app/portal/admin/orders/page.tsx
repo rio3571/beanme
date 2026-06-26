@@ -135,7 +135,9 @@ export default async function AdminOrdersPage() {
           {groups.map((g) => (
             <div key={g.ym}>
               <h2 className="font-bold text-stone-700 mb-2">{ymLabel(g.ym)}</h2>
-              <div className="space-y-3">{g.orders.map(renderCard)}</div>
+              <div className="grid gap-3 sm:grid-cols-2 items-start">
+                {g.orders.map(renderCard)}
+              </div>
             </div>
           ))}
         </div>

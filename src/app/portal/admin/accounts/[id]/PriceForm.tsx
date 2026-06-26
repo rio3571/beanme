@@ -50,7 +50,7 @@ export default function PriceForm({
       <p className="text-sm text-stone-500 mb-3">
         이 거래처의 단가를 입력하세요. <b>비워두면 기본단가</b>가 적용돼요.
       </p>
-      <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {rows.map((r) => (
           <div
             key={r.product_id}
@@ -80,8 +80,8 @@ export default function PriceForm({
         ))}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 px-4 sm:px-6 py-3">
+        <div className="max-w-5xl mx-auto flex items-center gap-3">
           {saved && (
             <span className="text-sm text-green-600 font-medium">
               저장됐어요 ✅

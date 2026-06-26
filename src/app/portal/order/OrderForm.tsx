@@ -87,7 +87,7 @@ export default function OrderForm({ items }: { items: OrderItem[] }) {
             <h2 className="text-xs font-bold text-amber-700 tracking-wide mb-2">
               {g.label}
             </h2>
-            <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {list.map((it) => {
                 const q = qty[it.id] || 0;
                 return (
@@ -156,8 +156,8 @@ export default function OrderForm({ items }: { items: OrderItem[] }) {
       )}
 
       {/* 하단 고정 합계 + 주문 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 px-4 sm:px-6 py-3">
+        <div className="max-w-5xl mx-auto flex items-center gap-3">
           <div className="flex-1">
             <div className="text-xs text-stone-400">합계 ({count}kg)</div>
             <div className="text-lg font-bold text-stone-800">{won(total)}</div>
