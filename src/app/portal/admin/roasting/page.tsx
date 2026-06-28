@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { roastDateKey, roastDateLabel, todayKstKey } from "@/lib/roasting";
+import RoastingRow from "./RoastingRow";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,10 @@ type OrderRow = {
 type ItemRow = {
   order_id: string;
   product_name: string;
-  unit: string | null;
   qty: number;
 };
+
+const STATUS_PRIORITY = ["requested", "confirmed", "shipped", "done"];
 
 export default async function RoastingPage() {
   const me = await getMyAccount();
@@ -25,11 +27,11 @@ export default async function RoastingPage() {
 
   const admin = createAdminClient();
 
-  // 로스팅 대상: 취소 제외, 최근 주문
+  // 로스팅 대상: 취소·완료 제외 (완료 누르면 목록에서 사라짐)
   const { data: orderData } = await admin
     .from("b2b_orders")
     .select("id, account_id, status, created_at")
-    .neq("status", "canceled")
+    .not("status", "in", "(canceled,done)")
     .order("created_at", { ascending: false })
     .limit(300);
   const orders = (orderData ?? []) as OrderRow[];
@@ -41,12 +43,20 @@ export default async function RoastingPage() {
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])
   );
 
+  // 품목 컬럼 순서 (활성 상품 기준)
+  const { data: prodData } = await admin
+    .from("products")
+    .select("name")
+    .eq("active", true)
+    .order("sort_order");
+  const columns: string[] = (prodData ?? []).map((p) => p.name as string);
+
   const ids = orders.map((o) => o.id);
   let items: ItemRow[] = [];
   if (ids.length > 0) {
     const { data: itemData } = await admin
       .from("b2b_order_items")
-      .select("order_id, product_name, unit, qty")
+      .select("order_id, product_name, qty")
       .in("order_id", ids);
     items = (itemData ?? []) as ItemRow[];
   }
@@ -55,71 +65,63 @@ export default async function RoastingPage() {
     const arr = itemsByOrder.get(it.order_id) ?? [];
     arr.push(it);
     itemsByOrder.set(it.order_id, arr);
+    if (!columns.includes(it.product_name)) columns.push(it.product_name); // 비활성 상품 보강
   }
 
-  // 로스팅 날짜별 그룹
-  type Batch = {
-    key: string;
-    productTotals: Map<string, number>; // 품목 → 총 kg
-    byAccount: Map<string, Map<string, number>>; // 거래처 → (품목 → kg)
-    accountOrder: string[]; // 거래처 등장 순서
+  // 로스팅 날짜 → 거래처 → {품목별 수량, 주문ids, 상태}
+  type AcctAgg = {
+    name: string;
+    orderIds: string[];
+    qty: Map<string, number>;
+    status: string; // 가장 진행 안 된 상태
   };
+  type Batch = { key: string; accounts: Map<string, AcctAgg>; order: string[] };
   const batchMap = new Map<string, Batch>();
-  const batchKeys: string[] = [];
 
   for (const o of orders) {
     const key = roastDateKey(o.created_at);
     let b = batchMap.get(key);
     if (!b) {
-      b = {
-        key,
-        productTotals: new Map(),
-        byAccount: new Map(),
-        accountOrder: [],
-      };
+      b = { key, accounts: new Map(), order: [] };
       batchMap.set(key, b);
-      batchKeys.push(key);
     }
-    const acct = nameMap.get(o.account_id) ?? "—";
-    let acctMap = b.byAccount.get(acct);
-    if (!acctMap) {
-      acctMap = new Map();
-      b.byAccount.set(acct, acctMap);
-      b.accountOrder.push(acct);
+    let a = b.accounts.get(o.account_id);
+    if (!a) {
+      a = {
+        name: nameMap.get(o.account_id) ?? "—",
+        orderIds: [],
+        qty: new Map(),
+        status: "done",
+      };
+      b.accounts.set(o.account_id, a);
+      b.order.push(o.account_id);
+    }
+    a.orderIds.push(o.id);
+    // 가장 진행 안 된 상태로 유지
+    if (
+      STATUS_PRIORITY.indexOf(o.status) < STATUS_PRIORITY.indexOf(a.status)
+    ) {
+      a.status = o.status;
     }
     for (const it of itemsByOrder.get(o.id) ?? []) {
-      b.productTotals.set(
-        it.product_name,
-        (b.productTotals.get(it.product_name) ?? 0) + (it.qty ?? 0)
-      );
-      acctMap.set(
-        it.product_name,
-        (acctMap.get(it.product_name) ?? 0) + (it.qty ?? 0)
-      );
+      a.qty.set(it.product_name, (a.qty.get(it.product_name) ?? 0) + (it.qty ?? 0));
     }
   }
 
-  // 로스팅 날짜 오름차순(가까운 미래 → 과거 순으로 정렬 후, 오늘 이후를 위로)
-  batchKeys.sort(); // 'YYYY-MM-DD' 문자열 정렬 = 날짜순
+  // 날짜 정렬: 오늘 이후(가까운 순) → 지난(최근 순)
+  const keys = [...batchMap.keys()].sort();
   const today = todayKstKey(new Date().toISOString());
-  // 오늘 포함 이후(예정) 먼저(가까운 순), 그 다음 지난 것(최근 순)
-  const upcoming = batchKeys.filter((k) => k >= today);
-  const past = batchKeys.filter((k) => k < today).reverse();
-  const ordered = [...upcoming, ...past];
-
-  const fmtItems = (m: Map<string, number>) =>
-    [...m.entries()]
-      .filter(([, q]) => q > 0)
-      .map(([name, q]) => `${name} ${q}kg`)
-      .join(" · ");
+  const ordered = [
+    ...keys.filter((k) => k >= today),
+    ...keys.filter((k) => k < today).reverse(),
+  ];
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-1">
-        <h1 className="text-lg font-bold text-stone-800">로스팅 목록</h1>
-      </div>
+      <h1 className="text-lg font-bold text-stone-800 mb-1">로스팅 목록</h1>
       <p className="text-xs text-stone-400 mb-4">
         월·수 주문 마감 → 화·목 로스팅. 화요일 = 목~월 주문 / 목요일 = 화·수 주문.
+        완료 누르면 목록에서 사라져요.
       </p>
 
       {ordered.length === 0 ? (
@@ -132,22 +134,31 @@ export default async function RoastingPage() {
             const b = batchMap.get(key)!;
             const isToday = key === today;
             const isUpcoming = key >= today;
-            const totalKg = [...b.productTotals.values()].reduce(
-              (s, v) => s + v,
-              0
+            const totals = columns.map((c) =>
+              b.order.reduce(
+                (s, aid) => s + (b.accounts.get(aid)!.qty.get(c) ?? 0),
+                0
+              )
             );
+            const totalKg = totals.reduce((s, v) => s + v, 0);
             return (
               <div
                 key={key}
-                className={`rounded-xl border p-4 ${
+                className={`rounded-xl border overflow-hidden ${
                   isToday
-                    ? "bg-amber-50 border-amber-300 ring-1 ring-amber-200"
-                    : isUpcoming
-                    ? "bg-white border-stone-200"
-                    : "bg-stone-50 border-stone-200 opacity-90"
+                    ? "border-amber-300 ring-1 ring-amber-200"
+                    : "border-stone-200"
                 }`}
               >
-                <div className="flex items-baseline justify-between mb-3">
+                <div
+                  className={`flex items-baseline justify-between px-4 py-3 ${
+                    isToday
+                      ? "bg-amber-50"
+                      : isUpcoming
+                      ? "bg-white"
+                      : "bg-stone-50"
+                  }`}
+                >
                   <div className="flex items-baseline gap-2">
                     <h2 className="font-bold text-stone-800">
                       {roastDateLabel(key)} 로스팅
@@ -163,41 +174,57 @@ export default async function RoastingPage() {
                   </span>
                 </div>
 
-                {/* 품목별 총 로스팅양 */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                  {[...b.productTotals.entries()]
-                    .filter(([, q]) => q > 0)
-                    .map(([name, q]) => (
-                      <div
-                        key={name}
-                        className="bg-white rounded-lg border border-stone-200 px-3 py-2"
-                      >
-                        <div className="text-xs text-stone-500">{name}</div>
-                        <div className="text-lg font-bold text-stone-800 leading-tight">
-                          {q}
-                          <span className="text-sm font-medium text-stone-400">
-                            kg
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-
-                {/* 거래처별 목록 */}
-                <div className="space-y-1">
-                  {b.accountOrder.map((acct) => (
-                    <div
-                      key={acct}
-                      className="flex items-baseline gap-2.5 bg-white rounded-lg border border-stone-200 px-3 py-2"
-                    >
-                      <div className="text-sm font-semibold text-stone-800 w-28 shrink-0 truncate">
-                        {acct}
-                      </div>
-                      <div className="text-sm text-stone-600 min-w-0">
-                        {fmtItems(b.byAccount.get(acct)!) || "—"}
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto bg-white">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-t border-b border-stone-200 bg-stone-50/70">
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-stone-500 whitespace-nowrap">
+                          거래처
+                        </th>
+                        {columns.map((c) => (
+                          <th
+                            key={c}
+                            className="px-2 py-2 text-center text-xs font-semibold text-stone-500 whitespace-nowrap"
+                          >
+                            {c}
+                          </th>
+                        ))}
+                        <th className="px-2 py-2 text-right text-xs font-semibold text-stone-500 whitespace-nowrap">
+                          상태
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {b.order.map((aid) => {
+                        const a = b.accounts.get(aid)!;
+                        return (
+                          <RoastingRow
+                            key={aid}
+                            name={a.name}
+                            orderIds={a.orderIds}
+                            qtys={columns.map((c) => a.qty.get(c) ?? 0)}
+                            status={a.status}
+                          />
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-stone-200 bg-stone-50">
+                        <td className="px-3 py-2 text-sm font-bold text-stone-700 whitespace-nowrap">
+                          합계
+                        </td>
+                        {totals.map((t, i) => (
+                          <td
+                            key={i}
+                            className="px-2 py-2 text-center text-sm font-bold text-stone-800 tabular-nums whitespace-nowrap"
+                          >
+                            {t > 0 ? `${t}kg` : "·"}
+                          </td>
+                        ))}
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
             );

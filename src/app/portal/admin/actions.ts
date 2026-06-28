@@ -164,5 +164,28 @@ export async function updateOrderStatus(
     .eq("id", orderId);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/portal/admin/orders");
+  revalidatePath("/portal/admin/roasting");
+  return { ok: true };
+}
+
+/** 여러 주문의 상태를 한 번에 변경 (로스팅 목록의 거래처별 일괄 처리용) */
+export async function updateOrdersStatus(
+  orderIds: string[],
+  status: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const allowed = ["requested", "confirmed", "shipped", "done", "canceled"];
+  if (!allowed.includes(status)) return { ok: false, error: "잘못된 상태." };
+  if (!orderIds.length) return { ok: true };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("b2b_orders")
+    .update({ status })
+    .in("id", orderIds);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/orders");
   return { ok: true };
 }
