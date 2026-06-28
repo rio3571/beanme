@@ -17,6 +17,7 @@ export default async function PortalLayout({
     ? [
         { href: "/portal/admin", label: "대시보드" },
         { href: "/portal/admin/orders", label: "주문" },
+        { href: "/portal/admin/roasting", label: "로스팅" },
         { href: "/portal/admin/messages", label: "문의" },
         { href: "/portal/admin/accounts", label: "거래처 관리" },
       ]

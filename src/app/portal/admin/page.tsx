@@ -123,7 +123,14 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <Link
+          href="/portal/admin/roasting"
+          className="bg-amber-600 rounded-xl border border-amber-600 p-4 text-center hover:bg-amber-700"
+        >
+          <div className="font-semibold text-white">로스팅 목록</div>
+          <div className="text-xs text-amber-100 mt-0.5">화·목 작업량</div>
+        </Link>
         <Link
           href="/portal/admin/accounts"
           className="bg-white rounded-xl border border-stone-200 p-4 text-center hover:border-amber-500"
