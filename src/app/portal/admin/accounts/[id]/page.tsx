@@ -6,6 +6,7 @@ import { parseMeta } from "@/lib/acctMeta";
 import PriceForm, { type PriceRow } from "./PriceForm";
 import BankForm from "./BankForm";
 import VatForm from "./VatForm";
+import CarryForm from "./CarryForm";
 import PasswordResetForm from "./PasswordResetForm";
 
 export const dynamic = "force-dynamic";
@@ -106,6 +107,11 @@ export default async function AccountPricePage({
       </div>
 
       <VatForm accountId={account.id} initial={meta.vat} />
+      <CarryForm
+        accountId={account.id}
+        productNames={products.map((p) => p.name)}
+        initial={meta.carry ?? []}
+      />
       <BankForm accountId={account.id} initial={meta.bank ?? ""} />
       <a
         href={`/portal/admin/accounts/${account.id}/statement`}

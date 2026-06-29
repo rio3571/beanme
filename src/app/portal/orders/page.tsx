@@ -4,8 +4,10 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { won, kst, ym, ymLabel, STATUS_LABEL } from "@/lib/format";
 import { parseMeta } from "@/lib/acctMeta";
+import { carrySummary } from "@/lib/carry";
 import OrderComments from "@/components/OrderComments";
 import DeleteOrderButton from "@/components/DeleteOrderButton";
+import ReportDelivery from "./ReportDelivery";
 import type { CommentRow } from "@/app/portal/comments";
 
 export const dynamic = "force-dynamic";
@@ -84,8 +86,14 @@ export default async function OrdersPage() {
     gmap.get(key)!.push(o);
   }
 
+  const meta = parseMeta(account.memo);
+  const carry = (meta.carry ?? []).filter((c) => c.qty !== 0);
+
   const renderCard = (o: OrderRow) => {
     const editable = o.status !== "done" && o.status !== "canceled";
+    const productNames = [
+      ...new Set((byOrder.get(o.id) ?? []).map((it) => it.product_name)),
+    ];
     return (
     <div key={o.id} className="bg-white rounded-xl border border-stone-200 p-4">
       <div className="flex items-center justify-between gap-2">
@@ -121,6 +129,11 @@ export default async function OrdersPage() {
       <div className="flex justify-end mt-2 font-bold text-stone-800">
         {won(o.total_amount)}
       </div>
+      <ReportDelivery
+        orderId={o.id}
+        productNames={productNames}
+        currentCarry={carry}
+      />
       <OrderComments
         orderId={o.id}
         role="buyer"
@@ -133,12 +146,18 @@ export default async function OrdersPage() {
   return (
     <div>
       <h1 className="text-lg font-bold text-stone-800 mb-4">주문내역</h1>
-      {parseMeta(account.memo).bank && (
+      {carry.length > 0 && (
+        <div className="bg-rose-50 border border-rose-300 rounded-xl px-4 py-3 mb-4">
+          <div className="text-sm font-bold text-rose-700">
+            📦 다음 주문에 자동 합산될 수량이 있어요
+          </div>
+          <div className="text-sm text-stone-700 mt-0.5">{carrySummary(carry)}</div>
+        </div>
+      )}
+      {meta.bank && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-4 text-sm">
           <span className="font-semibold text-amber-800">입금계좌 </span>
-          <span className="text-stone-700 whitespace-pre-wrap">
-            {parseMeta(account.memo).bank}
-          </span>
+          <span className="text-stone-700 whitespace-pre-wrap">{meta.bank}</span>
         </div>
       )}
       {orders.length === 0 ? (

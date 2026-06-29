@@ -6,6 +6,7 @@ import { notifyOwner } from "@/lib/telegram";
 import { won } from "@/lib/format";
 import { parseMeta, stringifyMeta } from "@/lib/acctMeta";
 import { carrySummary } from "@/lib/carry";
+import { revalidatePath } from "next/cache";
 
 export type OrderResult = { ok: boolean; orderNo?: string; error?: string };
 
@@ -155,6 +156,61 @@ export async function createOrder(input: {
   );
 
   return { ok: true, orderNo: order_no };
+}
+
+/** 거래처(받는 사람)가 '받은 수량이 주문과 다름'을 신고 → 내 계정 이월에 반영.
+ *  덜 받았으면 +, 더 받았으면 − (kg). 다음 주문에 자동 합산. */
+export async function reportOrderCarry(
+  orderId: string,
+  items: { name: string; qty: number }[]
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me) return { ok: false, error: "권한이 없습니다." };
+
+  const admin = createAdminClient();
+  const { data: order } = await admin
+    .from("b2b_orders")
+    .select("account_id, order_no")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!order) return { ok: false, error: "주문을 찾을 수 없어요." };
+
+  const acctId = order.account_id as string;
+  if (me.role !== "admin" && acctId !== me.id) {
+    return { ok: false, error: "권한이 없습니다." };
+  }
+
+  const { data: acct } = await admin
+    .from("b2b_accounts")
+    .select("memo, company_name")
+    .eq("id", acctId)
+    .maybeSingle();
+  const meta = parseMeta(acct?.memo as string | null | undefined);
+
+  const orderNames = items.map((i) => String(i.name));
+  const others = (meta.carry ?? []).filter((c) => !orderNames.includes(c.name));
+  const mine = items
+    .map((c) => ({ name: String(c.name).trim(), qty: Math.round(Number(c.qty) || 0) }))
+    .filter((c) => c.name && c.qty !== 0);
+  meta.carry = [...others, ...mine];
+
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ memo: stringifyMeta(meta) })
+    .eq("id", acctId);
+  if (error) return { ok: false, error: error.message };
+
+  if (mine.length > 0) {
+    await notifyOwner(
+      `[받은 수량 차이 신고] ${acct?.company_name ?? ""}\n주문 ${
+        order.order_no ?? ""
+      }\n${carrySummary(mine)}\n→ 다음 주문에 자동 합산됩니다.`
+    );
+  }
+
+  revalidatePath("/portal/orders");
+  revalidatePath("/portal/order");
+  return { ok: true };
 }
 
 export async function editOrder(
