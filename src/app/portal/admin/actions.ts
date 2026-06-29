@@ -117,6 +117,34 @@ export async function updateAccountBank(
   return { ok: true };
 }
 
+export async function setAccountCarry(
+  accountId: string,
+  items: { name: string; qty: number }[]
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const admin = createAdminClient();
+  const { data: cur } = await admin
+    .from("b2b_accounts")
+    .select("memo")
+    .eq("id", accountId)
+    .maybeSingle();
+  const meta = parseMeta(cur?.memo as string | null | undefined);
+  // 전달된 목록으로 이월을 '교체'(누적 아님) — 관리자가 보면서 직접 조정
+  const clean = (items ?? [])
+    .map((c) => ({ name: String(c.name).trim(), qty: Math.round(Number(c.qty) || 0) }))
+    .filter((c) => c.name && c.qty !== 0);
+  meta.carry = clean;
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ memo: stringifyMeta(meta) })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/portal/admin/orders");
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
 export async function updateAccountVat(
   accountId: string,
   vat: string

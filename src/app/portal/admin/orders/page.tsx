@@ -3,9 +3,12 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { won, kstDate, ym, ymLabel } from "@/lib/format";
 import StatusSelect from "./StatusSelect";
+import DeliveryAdjust from "./DeliveryAdjust";
 import OrderComments from "@/components/OrderComments";
 import DeleteOrderButton from "@/components/DeleteOrderButton";
 import type { CommentRow } from "@/app/portal/comments";
+import { parseMeta } from "@/lib/acctMeta";
+import { carrySummary, type CarryItem } from "@/lib/carry";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +44,15 @@ export default async function AdminOrdersPage() {
 
   const { data: acctData } = await admin
     .from("b2b_accounts")
-    .select("id, company_name");
+    .select("id, company_name, memo");
   const nameMap = new Map(
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])
+  );
+  const carryMap = new Map<string, CarryItem[]>(
+    (acctData ?? []).map((a) => [
+      a.id as string,
+      parseMeta(a.memo as string | null).carry ?? [],
+    ])
   );
 
   const ids = orders.map((o) => o.id);
@@ -95,6 +104,8 @@ export default async function AdminOrdersPage() {
     const summary = items
       .map((it) => `${it.product_name} ${it.qty}${it.unit}`)
       .join(" · ");
+    const productNames = [...new Set(items.map((it) => it.product_name))];
+    const carry = carryMap.get(o.account_id) ?? [];
     return (
       <div
         key={o.id}
@@ -121,6 +132,16 @@ export default async function AdminOrdersPage() {
         {o.note && (
           <div className="text-xs text-stone-400 mt-1.5">요청: {o.note}</div>
         )}
+        {carry.length > 0 && (
+          <div className="mt-1.5 inline-block rounded-lg bg-rose-50 border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-700">
+            📦 이월 대기: {carrySummary(carry)} (다음 주문에 자동 합산)
+          </div>
+        )}
+        <DeliveryAdjust
+          accountId={o.account_id}
+          productNames={productNames}
+          currentCarry={carry}
+        />
         <OrderComments
           orderId={o.id}
           role="admin"

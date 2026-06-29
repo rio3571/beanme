@@ -4,6 +4,8 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { notifyOwner } from "@/lib/telegram";
 import { won } from "@/lib/format";
+import { parseMeta, stringifyMeta } from "@/lib/acctMeta";
+import { carrySummary } from "@/lib/carry";
 
 export type OrderResult = { ok: boolean; orderNo?: string; error?: string };
 
@@ -29,13 +31,15 @@ export async function createOrder(input: {
   }
 
   const admin = createAdminClient();
-  const ids = wanted.map((i) => i.id);
 
+  // 활성 상품 전체 (이월 합산 시 미주문 품목도 추가될 수 있어 전체 로드)
   const { data: prodData } = await admin
     .from("products")
     .select("id, name, unit, base_price")
-    .in("id", ids);
+    .eq("active", true);
   const products = (prodData ?? []) as ProductRow[];
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const byName = new Map(products.map((p) => [p.name, p]));
 
   const { data: priceData } = await admin
     .from("account_prices")
@@ -44,27 +48,55 @@ export async function createOrder(input: {
   const priceMap = new Map(
     (priceData ?? []).map((p) => [p.product_id as string, p.unit_price as number])
   );
+  const priceOf = (p: ProductRow) => priceMap.get(p.id) ?? p.base_price;
 
-  const lines = wanted
-    .map((w) => {
-      const prod = products.find((p) => p.id === w.id);
-      if (!prod) return null;
-      const unit_price = priceMap.get(prod.id) ?? prod.base_price;
-      const qty = Math.max(0, Math.floor(w.qty));
-      if (qty <= 0) return null;
-      return {
-        product_id: prod.id,
-        product_name: prod.name,
-        unit: prod.unit,
-        unit_price,
-        qty,
-        line_amount: unit_price * qty,
-      };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null);
+  type Line = {
+    product_id: string;
+    product_name: string;
+    unit: string;
+    unit_price: number;
+    qty: number;
+    line_amount: number;
+  };
+  const mkLine = (p: ProductRow, qty: number): Line => {
+    const unit_price = priceOf(p);
+    return {
+      product_id: p.id,
+      product_name: p.name,
+      unit: p.unit,
+      unit_price,
+      qty,
+      line_amount: unit_price * qty,
+    };
+  };
 
+  const lineMap = new Map<string, Line>(); // product_id 기준
+  for (const w of wanted) {
+    const prod = byId.get(w.id);
+    if (!prod) continue;
+    const qty = Math.max(0, Math.floor(w.qty));
+    if (qty > 0) lineMap.set(prod.id, mkLine(prod, qty));
+  }
+
+  // 이월(출고 차이) 자동 합산
+  const carry = (parseMeta(account.memo).carry ?? []).filter((c) => c.qty !== 0);
+  const appliedCarry: { name: string; qty: number }[] = [];
+  for (const c of carry) {
+    const prod = byName.get(c.name);
+    if (!prod) continue;
+    const base = lineMap.get(prod.id)?.qty ?? 0;
+    const newQty = base + c.qty;
+    appliedCarry.push({ name: c.name, qty: c.qty });
+    if (newQty > 0) lineMap.set(prod.id, mkLine(prod, newQty));
+    else lineMap.delete(prod.id); // 전량 상계
+  }
+
+  const lines = [...lineMap.values()];
   if (lines.length === 0) return { ok: false, error: "주문할 상품이 없습니다." };
   const total = lines.reduce((s, l) => s + l.line_amount, 0);
+  const carryNote = appliedCarry.length
+    ? `[이월 합산] ${carrySummary(appliedCarry)}`
+    : "";
 
   const now = new Date();
   const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -75,6 +107,9 @@ export async function createOrder(input: {
     kstNow.getUTCSeconds()
   )}`;
 
+  const finalNote =
+    [input.note?.trim(), carryNote].filter(Boolean).join("\n") || null;
+
   const { data: order, error: oErr } = await admin
     .from("b2b_orders")
     .insert({
@@ -82,7 +117,7 @@ export async function createOrder(input: {
       account_id: account.id,
       status: "requested",
       total_amount: total,
-      note: input.note?.trim() || null,
+      note: finalNote,
     })
     .select("id")
     .single();
@@ -98,13 +133,25 @@ export async function createOrder(input: {
     return { ok: false, error: "주문 품목 저장에 실패했습니다." };
   }
 
+  // 이월 소진 (합산 적용됐으니 비움)
+  if (carry.length > 0) {
+    const meta = parseMeta(account.memo);
+    meta.carry = [];
+    await admin
+      .from("b2b_accounts")
+      .update({ memo: stringifyMeta(meta) })
+      .eq("id", account.id);
+  }
+
   const lineText = lines
     .map((l) => `· ${l.product_name} ${l.qty}${l.unit} = ${won(l.line_amount)}`)
     .join("\n");
   await notifyOwner(
     `[새 주문] ${account.company_name}\n주문번호 ${order_no}\n${lineText}\n합계 ${won(
       total
-    )}${input.note?.trim() ? `\n요청: ${input.note.trim()}` : ""}`
+    )}${carryNote ? `\n📦 ${carryNote}` : ""}${
+      input.note?.trim() ? `\n요청: ${input.note.trim()}` : ""
+    }`
   );
 
   return { ok: true, orderNo: order_no };
