@@ -20,7 +20,7 @@ export default async function AdminStatementPage({
 
   const { id } = await params;
   const sp = await searchParams;
-  const { buyer, months, selectedYm, rows, total } = await loadStatement(
+  const { buyer, months, selectedYm, rows, total, vatMode } = await loadStatement(
     id,
     sp.ym
   );
@@ -55,6 +55,7 @@ export default async function AdminStatementPage({
         monthYm={selectedYm}
         rows={rows}
         total={total}
+        vatMode={vatMode}
       />
     </div>
   );

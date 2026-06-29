@@ -5,6 +5,7 @@ import { displayLoginId } from "@/lib/loginId";
 import { parseMeta } from "@/lib/acctMeta";
 import PriceForm, { type PriceRow } from "./PriceForm";
 import BankForm from "./BankForm";
+import VatForm from "./VatForm";
 import PasswordResetForm from "./PasswordResetForm";
 
 export const dynamic = "force-dynamic";
@@ -104,6 +105,7 @@ export default async function AccountPricePage({
         <PasswordResetForm accountId={account.id} />
       </div>
 
+      <VatForm accountId={account.id} initial={meta.vat} />
       <BankForm accountId={account.id} initial={meta.bank ?? ""} />
       <a
         href={`/portal/admin/accounts/${account.id}/statement`}

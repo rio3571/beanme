@@ -156,6 +156,11 @@ data/
 - env(.env.local + Vercel Production/Development): `SUPABASE_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_CHAT_ID` (모두 서버 전용, gitignore됨).
 - **Vercel 함수 리전 `icn1`(서울)** — `vercel.json`. DB와 동일 지역으로 지연 최소화. 무료 Supabase는 idle 시 콜드스타트 → 운영 본격화 시 Pro 권장.
 
+### 2026-06-28 로스팅 목록 추가
+- `/portal/admin/roasting` (관리자 메뉴 "로스팅" 탭 + 대시보드 카드). `src/lib/roasting.ts` + `roasting/page.tsx` + `RoastingRow.tsx`.
+- 운영 사이클: 월·수 주문마감 → 화·목 로스팅. 화요일=목~월 주문 / 목요일=화·수 주문. 주문 created_at(KST 요일)으로 로스팅 날짜 자동 배치.
+- 거래처 × 품목(산·바다·노을·디카페인) **행렬 표** + 합계행. 각 거래처 줄에 **접수/확인/완료 버튼**(해당 배치 주문 일괄, `updateOrdersStatus` 액션). **완료·취소는 목록에서 제외**(쿼리 `not in (canceled,done)`).
+
 ### 미완료 / 다음
 - ⏳ `supabase_bank_info.sql` (입금계좌 컬럼) **사용자 Run 대기** — 실행 전엔 계좌 기능 비활성(코드는 안 깨짐).
 - 3단계: **전자세금계산서 자동발행**(팝빌 등 연동) — 거래명세서는 완료, 세금계산서는 추후.

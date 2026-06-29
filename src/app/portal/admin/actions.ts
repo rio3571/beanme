@@ -117,6 +117,32 @@ export async function updateAccountBank(
   return { ok: true };
 }
 
+export async function updateAccountVat(
+  accountId: string,
+  vat: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  if (!["excluded", "included", "cash"].includes(vat)) {
+    return { ok: false, error: "잘못된 부가세 모드." };
+  }
+  const admin = createAdminClient();
+  const { data: cur } = await admin
+    .from("b2b_accounts")
+    .select("memo")
+    .eq("id", accountId)
+    .maybeSingle();
+  const meta = parseMeta(cur?.memo as string | null | undefined);
+  meta.vat = vat as "excluded" | "included" | "cash";
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ memo: stringifyMeta(meta) })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
 export async function updateAccountPassword(
   accountId: string,
   newPw: string

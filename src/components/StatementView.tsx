@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { won, kstDate, ymLabel } from "@/lib/format";
 import { SUPPLIER } from "@/lib/supplier";
+import { vatAmounts, VAT_LABEL, DEFAULT_VAT, type VatMode } from "@/lib/vat";
 
 export type StmtRow = {
   date: string;
@@ -27,17 +28,18 @@ export default function StatementView({
   monthYm,
   rows,
   total,
+  vatMode = DEFAULT_VAT,
 }: {
   buyer: StmtBuyer;
   monthYm: string;
   rows: StmtRow[];
   total: number;
+  vatMode?: VatMode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
 
-  const vat = Math.round(total * 0.1);
-  const grand = total + vat;
+  const { supply, vat, total: grand } = vatAmounts(total, vatMode);
 
   async function savePdf() {
     if (!ref.current) return;
@@ -119,7 +121,7 @@ export default function StatementView({
             거 래 명 세 서
           </div>
           <div className="text-center text-sm text-stone-500 mb-4">
-            {ymLabel(monthYm)} 거래내역
+            {ymLabel(monthYm)} 거래내역 · {VAT_LABEL[vatMode]}
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
@@ -205,11 +207,13 @@ export default function StatementView({
                 <tr>
                   <td className="px-3 py-1 text-stone-500">공급가액</td>
                   <td className="px-3 py-1 text-right font-medium w-36">
-                    {won(total)}
+                    {won(supply)}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-1 text-stone-500">부가세 (10%)</td>
+                  <td className="px-3 py-1 text-stone-500">
+                    {vatMode === "cash" ? "부가세 (현금·면세)" : "부가세 (10%)"}
+                  </td>
                   <td className="px-3 py-1 text-right font-medium">{won(vat)}</td>
                 </tr>
                 <tr className="border-t-2 border-stone-800">

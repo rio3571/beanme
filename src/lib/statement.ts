@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { ym } from "@/lib/format";
 import { parseMeta } from "@/lib/acctMeta";
+import { DEFAULT_VAT, type VatMode } from "@/lib/vat";
 import type { StmtRow, StmtBuyer } from "@/components/StatementView";
 
 export type StatementData = {
@@ -9,6 +10,7 @@ export type StatementData = {
   selectedYm: string;
   rows: StmtRow[];
   total: number;
+  vatMode: VatMode;
 };
 
 export async function loadStatement(
@@ -62,9 +64,7 @@ export async function loadStatement(
   }
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
-  const bank = parseMeta(
-    (acct as { memo?: string | null } | null)?.memo
-  ).bank;
-  const buyer = (acct ? { ...acct, bank } : null) as StmtBuyer;
-  return { buyer, months, selectedYm, rows, total };
+  const meta = parseMeta((acct as { memo?: string | null } | null)?.memo);
+  const buyer = (acct ? { ...acct, bank: meta.bank } : null) as StmtBuyer;
+  return { buyer, months, selectedYm, rows, total, vatMode: meta.vat ?? DEFAULT_VAT };
 }

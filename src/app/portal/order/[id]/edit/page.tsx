@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { parseMeta } from "@/lib/acctMeta";
+import { DEFAULT_VAT } from "@/lib/vat";
 import OrderForm, { type OrderItem } from "../../OrderForm";
 
 export const dynamic = "force-dynamic";
@@ -84,6 +86,7 @@ export default async function EditOrderPage({
         orderId={id}
         initialQty={initialQty}
         initialNote={order.note ?? ""}
+        vatMode={parseMeta(account.memo).vat ?? DEFAULT_VAT}
       />
     </div>
   );

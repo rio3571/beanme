@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createOrder, editOrder } from "./actions";
 import { won } from "@/lib/format";
+import { displayUnit, vatAmounts, VAT_LABEL, DEFAULT_VAT, type VatMode } from "@/lib/vat";
 
 export type OrderItem = {
   id: string;
@@ -17,11 +18,13 @@ export default function OrderForm({
   orderId,
   initialQty,
   initialNote,
+  vatMode = DEFAULT_VAT,
 }: {
   items: OrderItem[];
   orderId?: string;
   initialQty?: Record<string, number>;
   initialNote?: string;
+  vatMode?: VatMode;
 }) {
   const [qty, setQty] = useState<Record<string, number>>(initialQty ?? {});
   const [note, setNote] = useState(initialNote ?? "");
@@ -29,7 +32,10 @@ export default function OrderForm({
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const total = items.reduce((s, it) => s + (qty[it.id] || 0) * it.price, 0);
+  // 저장 단가는 공급가(net). 모드에 따라 표시·합계만 달라짐.
+  const netTotal = items.reduce((s, it) => s + (qty[it.id] || 0) * it.price, 0);
+  const amt = vatAmounts(netTotal, vatMode);
+  const total = netTotal;
   const count = items.reduce((s, it) => s + (qty[it.id] || 0), 0);
 
   function setItemQty(id: string, v: number) {
@@ -91,6 +97,9 @@ export default function OrderForm({
       <h1 className="text-lg font-bold text-stone-800 mb-1">원두 주문</h1>
       <p className="text-sm text-stone-500 mb-4">
         수량(kg)을 입력하고 주문하기를 눌러주세요. 가격은 거래처 단가가 적용됩니다.
+        <span className="ml-1.5 inline-block rounded-full bg-stone-100 text-stone-600 text-xs font-medium px-2 py-0.5">
+          {VAT_LABEL[vatMode]}
+        </span>
       </p>
 
       {groups.map((g) => {
@@ -114,7 +123,7 @@ export default function OrderForm({
                         {it.name}
                       </div>
                       <div className="text-sm text-stone-500">
-                        {won(it.price)} / {it.unit}
+                        {won(displayUnit(it.price, vatMode))} / {it.unit}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -172,9 +181,22 @@ export default function OrderForm({
       {/* 하단 고정 합계 + 주문 */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 px-4 sm:px-6 py-3">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <div className="flex-1">
-            <div className="text-xs text-stone-400">합계 ({count}kg)</div>
-            <div className="text-lg font-bold text-stone-800">{won(total)}</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-stone-400">
+              합계 ({count}kg)
+              {vatMode === "excluded" && (
+                <span className="ml-1">
+                  · 공급가 {won(amt.supply)} + 부가세 {won(amt.vat)}
+                </span>
+              )}
+              {vatMode === "included" && (
+                <span className="ml-1">· 부가세 포함</span>
+              )}
+              {vatMode === "cash" && <span className="ml-1">· 부가세 없음</span>}
+            </div>
+            <div className="text-lg font-bold text-stone-800">
+              {won(amt.total)}
+            </div>
           </div>
           <button
             onClick={submit}
