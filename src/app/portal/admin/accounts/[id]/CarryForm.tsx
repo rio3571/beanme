@@ -61,8 +61,8 @@ export default function CarryForm({
       </div>
       <p className="text-xs text-stone-500 mb-3 leading-relaxed">
         주문과 실제 출고량이 다를 때만 적어주세요. <b>덜 보냈으면 +</b>,{" "}
-        <b>더 보냈으면 −</b> (kg). 입력한 만큼 <b>다음 주문에 자동 합산</b>되고
-        합산 후 자동으로 비워져요. (평소엔 비워두면 됩니다)
+        <b>더 보냈으면 −</b> (kg). 입력한 만큼 거래처에 <b>‘받아야 할 것’</b>으로
+        표시돼요(금액 청구 X). 실제로 보내준 뒤 <b>0으로 비우면</b> 됩니다.
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {productNames.map((n) => (

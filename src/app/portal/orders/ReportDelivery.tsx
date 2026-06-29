@@ -56,7 +56,8 @@ export default function ReportDelivery({
         <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50/60 p-3">
           <p className="text-xs text-stone-600 mb-2 leading-relaxed">
             실제 받은 양이 주문과 다를 때만 적어주세요. <b>덜 받았으면 +</b>,{" "}
-            <b>더 받았으면 −</b> (kg). 적은 만큼 <b>다음 주문에 자동으로 합산</b>돼요.
+            <b>더 받았으면 −</b> (kg). 적은 만큼 <b>‘받아야 할 것’으로 기록</b>돼요
+            (다음 출고 때 추가로 받고, 금액은 청구되지 않아요).
           </p>
           <div className="grid gap-1.5">
             {productNames.map((n) => (

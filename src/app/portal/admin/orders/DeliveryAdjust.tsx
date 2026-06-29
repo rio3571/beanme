@@ -64,7 +64,8 @@ export default function DeliveryAdjust({
         <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50/50 p-3">
           <p className="text-xs text-stone-600 mb-2 leading-relaxed">
             주문과 실제 출고량이 다를 때만 적어주세요. <b>덜 보냈으면 +</b>,{" "}
-            <b>더 보냈으면 −</b> (kg). 입력한 만큼 <b>다음 주문에 자동 합산</b>돼요.
+            <b>더 보냈으면 −</b> (kg). 거래처에 <b>‘받아야 할 것’</b>으로 표시돼요
+            (금액 청구 X). 보내준 뒤 0으로 비우세요.
           </p>
           <div className="grid gap-1.5 sm:grid-cols-2">
             {productNames.map((n) => (

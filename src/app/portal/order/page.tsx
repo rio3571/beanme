@@ -53,10 +53,13 @@ export default async function OrderPage() {
       {carry.length > 0 && (
         <div className="bg-rose-50 border border-rose-300 rounded-xl px-4 py-3 mb-4">
           <div className="text-sm font-bold text-rose-700">
-            📦 지난 출고 차이가 이번 주문에 자동 합산돼요
+            📦 아직 받지 못한 수량(이월)이 있어요
           </div>
           <div className="text-sm text-stone-700 mt-0.5">
             {carrySummary(carry)}
+          </div>
+          <div className="text-xs text-stone-500 mt-1">
+            이번 주문과 <b>별개</b>로 추가로 받게 돼요. (이번 주문 금액엔 포함되지 않아요)
           </div>
         </div>
       )}

@@ -149,9 +149,12 @@ export default async function OrdersPage() {
       {carry.length > 0 && (
         <div className="bg-rose-50 border border-rose-300 rounded-xl px-4 py-3 mb-4">
           <div className="text-sm font-bold text-rose-700">
-            📦 다음 주문에 자동 합산될 수량이 있어요
+            📦 아직 받지 못한 수량(이월)이 있어요
           </div>
           <div className="text-sm text-stone-700 mt-0.5">{carrySummary(carry)}</div>
+          <div className="text-xs text-stone-500 mt-1">
+            다음 출고 때 추가로 받게 돼요. (주문 금액과는 별개)
+          </div>
         </div>
       )}
       {meta.bank && (

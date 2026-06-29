@@ -134,7 +134,7 @@ export default async function AdminOrdersPage() {
         )}
         {carry.length > 0 && (
           <div className="mt-1.5 inline-block rounded-lg bg-rose-50 border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-700">
-            📦 이월 대기: {carrySummary(carry)} (다음 주문에 자동 합산)
+            📦 받아야 할 것(이월): {carrySummary(carry)} · 출고 후 0으로 비우기
           </div>
         )}
         <DeliveryAdjust
