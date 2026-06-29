@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { won, ym, ymLabel } from "@/lib/format";
+import { parseMeta } from "@/lib/acctMeta";
+import { DEFAULT_VAT } from "@/lib/vat";
 
 export const dynamic = "force-dynamic";
 
@@ -16,17 +18,38 @@ export default async function AdminDashboard() {
 
   const { data: orderData } = await admin
     .from("b2b_orders")
-    .select("id, total_amount, created_at, status");
+    .select("id, account_id, total_amount, created_at, status");
   const orders = (orderData ?? []) as {
     id: string;
+    account_id: string;
     total_amount: number;
     created_at: string;
     status: string;
   }[];
   const monthOrders = orders.filter((o) => ym(o.created_at) === thisYm);
   const monthCount = monthOrders.length;
-  const monthSales = monthOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
   const pendingCount = orders.filter((o) => o.status === "requested").length;
+
+  // 거래처별 부가세 모드 (현금 매출 분리용)
+  const { data: acctRows } = await admin
+    .from("b2b_accounts")
+    .select("id, role, memo");
+  const vatMap = new Map(
+    (acctRows ?? []).map((a) => [
+      a.id as string,
+      parseMeta(a.memo as string | null).vat ?? DEFAULT_VAT,
+    ])
+  );
+  const acctCount = (acctRows ?? []).filter((a) => a.role === "buyer").length;
+
+  // 매출 분리: 현금 vs 부가세(별도+포함)
+  let salesCash = 0;
+  let salesVat = 0;
+  for (const o of monthOrders) {
+    const mode = vatMap.get(o.account_id) ?? DEFAULT_VAT;
+    if (mode === "cash") salesCash += o.total_amount || 0;
+    else salesVat += o.total_amount || 0;
+  }
 
   const monthIds = monthOrders.map((o) => o.id);
   const qtyMap = new Map<string, number>();
@@ -56,12 +79,6 @@ export default async function AdminDashboard() {
     (m) => m.sender === "buyer" && !m.read_by_admin
   ).length;
 
-  const { data: acctData } = await admin
-    .from("b2b_accounts")
-    .select("id")
-    .eq("role", "buyer");
-  const acctCount = (acctData ?? []).length;
-
   const metric = (
     label: string,
     value: string,
@@ -84,9 +101,10 @@ export default async function AdminDashboard() {
         <span className="text-sm text-stone-400">{ymLabel(thisYm)} 기준</span>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 mb-3">
         {metric("이번 달 주문", `${monthCount}건`, undefined, "bg-amber-50 border-amber-100")}
-        {metric("이번 달 매출", won(monthSales), "VAT 별도", "bg-emerald-50 border-emerald-100")}
+        {metric("부가세 매출", won(salesVat), "별도+포함 · 공급가", "bg-emerald-50 border-emerald-100")}
+        {metric("현금 매출", won(salesCash), "부가세 없음 · 따로 관리", "bg-teal-50 border-teal-100")}
         <Link href="/portal/admin/orders" className="contents">
           {metric("처리 대기", `${pendingCount}건`, "접수 상태", "bg-orange-50 border-orange-100")}
         </Link>
