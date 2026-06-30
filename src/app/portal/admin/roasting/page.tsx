@@ -3,7 +3,7 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { roastDateKey, roastDateLabel, todayKstKey } from "@/lib/roasting";
 import RoastingRow from "./RoastingRow";
-import ManualRoast from "./ManualRoast";
+import TodayRoast from "./TodayRoast";
 
 export const dynamic = "force-dynamic";
 
@@ -117,17 +117,23 @@ export default async function RoastingPage() {
     ...keys.filter((k) => k < today).reverse(),
   ];
 
-  // 오늘 로스팅 배치의 품목별 주문 합계 (수기 추가와 합산 표시용)
+  // 오늘 로스팅 배치 → 클라이언트 표(수기 추가 포함)로 렌더
   const todayBatch = batchMap.get(today);
-  const todayTotals: Record<string, number> = {};
-  for (const c of columns) {
-    todayTotals[c] = todayBatch
-      ? todayBatch.order.reduce(
-          (s, aid) => s + (todayBatch.accounts.get(aid)!.qty.get(c) ?? 0),
-          0
-        )
-      : 0;
-  }
+  const todayOrderRows = todayBatch
+    ? todayBatch.order.map((aid) => {
+        const a = todayBatch.accounts.get(aid)!;
+        const qtys: Record<string, number> = {};
+        for (const c of columns) qtys[c] = a.qty.get(c) ?? 0;
+        return {
+          accountId: aid,
+          name: a.name,
+          qtys,
+          orderIds: a.orderIds,
+          status: a.status,
+        };
+      })
+    : [];
+  const otherKeys = ordered.filter((k) => k !== today);
 
   return (
     <div>
@@ -137,15 +143,15 @@ export default async function RoastingPage() {
         완료 누르면 목록에서 사라져요.
       </p>
 
-      <ManualRoast products={columns} orderTotals={todayTotals} />
+      <TodayRoast
+        columns={columns}
+        dateLabel={roastDateLabel(today)}
+        rows={todayOrderRows}
+      />
 
-      {ordered.length === 0 ? (
-        <p className="text-stone-400 text-center py-16">
-          로스팅할 주문이 없어요.
-        </p>
-      ) : (
+      {otherKeys.length > 0 && (
         <div className="space-y-4">
-          {ordered.map((key) => {
+          {otherKeys.map((key) => {
             const b = batchMap.get(key)!;
             const isToday = key === today;
             const isUpcoming = key >= today;
