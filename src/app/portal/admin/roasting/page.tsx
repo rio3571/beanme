@@ -3,6 +3,7 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { roastDateKey, roastDateLabel, todayKstKey } from "@/lib/roasting";
 import RoastingRow from "./RoastingRow";
+import ManualRoast from "./ManualRoast";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,18 @@ export default async function RoastingPage() {
     ...keys.filter((k) => k < today).reverse(),
   ];
 
+  // 오늘 로스팅 배치의 품목별 주문 합계 (수기 추가와 합산 표시용)
+  const todayBatch = batchMap.get(today);
+  const todayTotals: Record<string, number> = {};
+  for (const c of columns) {
+    todayTotals[c] = todayBatch
+      ? todayBatch.order.reduce(
+          (s, aid) => s + (todayBatch.accounts.get(aid)!.qty.get(c) ?? 0),
+          0
+        )
+      : 0;
+  }
+
   return (
     <div>
       <h1 className="text-lg font-bold text-stone-800 mb-1">로스팅 목록</h1>
@@ -123,6 +136,8 @@ export default async function RoastingPage() {
         월·수 주문 마감 → 화·목 로스팅. 화요일 = 목~월 주문 / 목요일 = 화·수 주문.
         완료 누르면 목록에서 사라져요.
       </p>
+
+      <ManualRoast products={columns} orderTotals={todayTotals} />
 
       {ordered.length === 0 ? (
         <p className="text-stone-400 text-center py-16">
