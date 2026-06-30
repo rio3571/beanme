@@ -2,9 +2,36 @@
 
 import { useEffect, useState } from "react";
 
-type Entry = { id: string; account: string; product: string; qty: number };
+type Entry = { id: string; account: string; qtys: Record<string, number> };
 
 const KEY = "beanme_roast_manual";
+
+// 예전(단일품목) 저장 형식도 읽히게 정규화
+function normalize(raw: unknown): Entry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((e, i): Entry | null => {
+      if (!e || typeof e !== "object") return null;
+      const o = e as Record<string, unknown>;
+      if (o.qtys && typeof o.qtys === "object") {
+        return {
+          id: String(o.id ?? i),
+          account: String(o.account ?? ""),
+          qtys: o.qtys as Record<string, number>,
+        };
+      }
+      // 구형: { product, qty }
+      if (typeof o.product === "string") {
+        return {
+          id: String(o.id ?? i),
+          account: String(o.account ?? ""),
+          qtys: { [o.product]: Number(o.qty) || 0 },
+        };
+      }
+      return null;
+    })
+    .filter((x): x is Entry => x !== null);
+}
 
 export default function ManualRoast({
   products,
@@ -16,37 +43,33 @@ export default function ManualRoast({
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [account, setAccount] = useState("");
-  const [product, setProduct] = useState(products[0] ?? "");
-  const [qty, setQty] = useState("");
+  const [vals, setVals] = useState<Record<string, string>>({});
 
-  // 최초 로드
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) setEntries(JSON.parse(raw));
+      if (raw) setEntries(normalize(JSON.parse(raw)));
     } catch {}
     setLoaded(true);
   }, []);
 
-  // 변경 시 저장
   useEffect(() => {
     if (loaded) localStorage.setItem(KEY, JSON.stringify(entries));
   }, [entries, loaded]);
 
   function add() {
-    const q = Math.round(Number(qty) || 0);
-    if (!product || q <= 0) return;
-    setEntries((p) => [
-      ...p,
-      {
-        id: `${product}-${q}-${p.length}-${account}`,
-        account: account.trim(),
-        product,
-        qty: q,
-      },
+    const qtys: Record<string, number> = {};
+    for (const p of products) {
+      const q = Math.round(Number(vals[p]) || 0);
+      if (q > 0) qtys[p] = q;
+    }
+    if (Object.keys(qtys).length === 0) return;
+    setEntries((prev) => [
+      ...prev,
+      { id: `m${prev.length}-${account}-${Object.values(qtys).join("_")}`, account: account.trim(), qtys },
     ]);
     setAccount("");
-    setQty("");
+    setVals({});
   }
 
   function remove(id: string) {
@@ -56,15 +79,15 @@ export default function ManualRoast({
   // 수기 품목별 합계
   const manualByProduct: Record<string, number> = {};
   for (const e of entries) {
-    manualByProduct[e.product] = (manualByProduct[e.product] ?? 0) + e.qty;
+    for (const [p, q] of Object.entries(e.qtys)) {
+      manualByProduct[p] = (manualByProduct[p] ?? 0) + q;
+    }
   }
 
-  // 모든 품목(주문 컬럼 + 수기에만 있는 품목)
   const allProducts = [
     ...products,
     ...Object.keys(manualByProduct).filter((p) => !products.includes(p)),
   ];
-
   const grand = allProducts.reduce(
     (s, p) => s + (orderTotals[p] ?? 0) + (manualByProduct[p] ?? 0),
     0
@@ -76,43 +99,45 @@ export default function ManualRoast({
         ✍️ 수기 추가 (다른 경로 주문)
       </div>
       <p className="text-xs text-stone-400 mb-3">
-        전화·카톡 등 따로 들어온 주문을 적어두면 아래 합계에 같이 잡혀요. (이 브라우저에만 저장)
+        전화·카톡 등 따로 들어온 주문을 거래처별로 적어두면 아래 합계에 같이 잡혀요. (이 브라우저에만 저장)
       </p>
 
-      {/* 입력 */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+      {/* 입력: 거래처 + 품목별 수량 한 번에 */}
+      <div className="rounded-lg border border-stone-200 p-3 mb-3">
         <input
           value={account}
           onChange={(e) => setAccount(e.target.value)}
-          placeholder="거래처 (선택)"
-          className="h-9 w-28 rounded-lg border border-stone-300 px-2 text-sm outline-none focus:border-amber-600"
+          placeholder="거래처 이름 (선택)"
+          className="h-9 w-full sm:w-52 rounded-lg border border-stone-300 px-2.5 text-sm outline-none focus:border-amber-600 mb-2"
         />
-        <select
-          value={product}
-          onChange={(e) => setProduct(e.target.value)}
-          className="h-9 rounded-lg border border-stone-300 px-2 text-sm bg-white outline-none focus:border-amber-600"
-        >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {products.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
+            <div
+              key={p}
+              className="flex items-center gap-1.5 bg-stone-50 rounded-lg border border-stone-200 px-2.5 py-1.5"
+            >
+              <span className="text-sm text-stone-700 flex-1 truncate">{p}</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={vals[p] ?? ""}
+                onChange={(e) => setVals((v) => ({ ...v, [p]: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && add()}
+                placeholder="0"
+                className="w-14 h-8 text-right rounded-md border border-stone-300 px-1.5 text-sm outline-none focus:border-amber-600"
+              />
+              <span className="text-xs text-stone-400">kg</span>
+            </div>
           ))}
-        </select>
-        <input
-          type="number"
-          inputMode="numeric"
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="kg"
-          className="h-9 w-16 text-right rounded-lg border border-stone-300 px-2 text-sm outline-none focus:border-amber-600"
-        />
-        <button
-          onClick={add}
-          className="h-9 rounded-lg bg-amber-700 text-white text-sm font-semibold px-3 hover:bg-amber-800"
-        >
-          추가
-        </button>
+        </div>
+        <div className="flex justify-end mt-2">
+          <button
+            onClick={add}
+            className="h-9 rounded-lg bg-amber-700 text-white text-sm font-semibold px-5 hover:bg-amber-800"
+          >
+            추가
+          </button>
+        </div>
       </div>
 
       {/* 수기 목록 */}
@@ -125,7 +150,10 @@ export default function ManualRoast({
             >
               {e.account ? `${e.account} · ` : ""}
               <b>
-                {e.product} {e.qty}kg
+                {Object.entries(e.qtys)
+                  .map(([p, q]) => `${p} ${q}`)
+                  .join(" · ")}
+                kg
               </b>
               <button
                 onClick={() => remove(e.id)}
