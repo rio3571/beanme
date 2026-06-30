@@ -7,6 +7,7 @@ import PriceForm, { type PriceRow } from "./PriceForm";
 import BankForm from "./BankForm";
 import VatForm from "./VatForm";
 import CarryForm from "./CarryForm";
+import NameForm from "./NameForm";
 import PasswordResetForm from "./PasswordResetForm";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,7 @@ export default async function AccountPricePage({
           {[account.contact_name, account.phone].filter(Boolean).join(" · ") ||
             "—"}
         </p>
+        <NameForm accountId={account.id} initial={account.company_name} />
       </div>
 
       <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">

@@ -117,6 +117,26 @@ export async function updateAccountBank(
   return { ok: true };
 }
 
+export async function updateAccountName(
+  accountId: string,
+  name: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const n = String(name).trim();
+  if (!n) return { ok: false, error: "이름을 입력하세요." };
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ company_name: n })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  revalidatePath("/portal/admin/accounts");
+  revalidatePath("/portal/admin/orders");
+  return { ok: true };
+}
+
 export async function setAccountCarry(
   accountId: string,
   items: { name: string; qty: number }[]
