@@ -8,7 +8,9 @@ import BankForm from "./BankForm";
 import VatForm from "./VatForm";
 import CarryForm from "./CarryForm";
 import NameForm from "./NameForm";
+import TaxInfoForm from "./TaxInfoForm";
 import PasswordResetForm from "./PasswordResetForm";
+import { DEFAULT_VAT } from "@/lib/vat";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +111,19 @@ export default async function AccountPricePage({
       </div>
 
       <VatForm accountId={account.id} initial={meta.vat} />
+      <TaxInfoForm
+        accountId={account.id}
+        companyName={account.company_name}
+        vat={meta.vat ?? DEFAULT_VAT}
+        initial={{
+          businessNo: account.business_no ?? "",
+          address: account.address ?? "",
+          ceo: meta.tax?.ceo ?? "",
+          bizType: meta.tax?.bizType ?? "",
+          bizItem: meta.tax?.bizItem ?? "",
+          email: meta.tax?.email ?? "",
+        }}
+      />
       <CarryForm
         accountId={account.id}
         productNames={products.map((p) => p.name)}

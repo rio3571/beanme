@@ -117,6 +117,47 @@ export async function updateAccountBank(
   return { ok: true };
 }
 
+export async function updateAccountTax(
+  accountId: string,
+  input: {
+    businessNo?: string;
+    address?: string;
+    ceo?: string;
+    bizType?: string;
+    bizItem?: string;
+    email?: string;
+  }
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+
+  const admin = createAdminClient();
+  const { data: cur } = await admin
+    .from("b2b_accounts")
+    .select("memo")
+    .eq("id", accountId)
+    .maybeSingle();
+  const meta = parseMeta(cur?.memo as string | null | undefined);
+  meta.tax = {
+    ceo: (input.ceo ?? "").trim() || undefined,
+    bizType: (input.bizType ?? "").trim() || undefined,
+    bizItem: (input.bizItem ?? "").trim() || undefined,
+    email: (input.email ?? "").trim() || undefined,
+  };
+
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({
+      business_no: (input.businessNo ?? "").trim() || null,
+      address: (input.address ?? "").trim() || null,
+      memo: stringifyMeta(meta),
+    })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
 export async function updateAccountName(
   accountId: string,
   name: string
