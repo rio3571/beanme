@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { loadStatement } from "@/lib/statement";
 import { parseMeta } from "@/lib/acctMeta";
 import { SUPPLIER } from "@/lib/supplier";
-import { registIssue, POPBILL_IS_TEST } from "@/lib/popbill";
+import { registIssue, POPBILL_IS_TEST, POPBILL_CORP_NUM } from "@/lib/popbill";
 
 function ymd(ts: string): string {
   const k = new Date(new Date(ts).getTime() + 9 * 60 * 60 * 1000);
@@ -100,9 +100,10 @@ export async function issueTaxInvoice(
     purposeType: "청구",
     taxType: "과세",
 
-    // 공급자 (희연재)
+    // 공급자 — 발행 CorpNum(=인증서 사업자번호)과 반드시 일치해야 함.
+    // 테스트: env POPBILL_CORP_NUM=123-45-67890 / 운영: 희연재 184-87-02137
     invoicerMgtKey: mgtKey,
-    invoicerCorpNum: SUPPLIER.bizNo.replace(/\D/g, ""),
+    invoicerCorpNum: POPBILL_CORP_NUM,
     invoicerCorpName: SUPPLIER.name,
     invoicerCEOName: SUPPLIER.ceo,
     invoicerAddr: SUPPLIER.address,
