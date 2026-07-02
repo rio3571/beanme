@@ -9,6 +9,7 @@ import DeleteOrderButton from "@/components/DeleteOrderButton";
 import type { CommentRow } from "@/app/portal/comments";
 import { parseMeta } from "@/lib/acctMeta";
 import { carrySummary, type CarryItem } from "@/lib/carry";
+import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -154,7 +155,10 @@ export default async function AdminOrdersPage() {
 
   return (
     <div>
-      <h1 className="text-lg font-bold text-stone-800 mb-4">전체 주문</h1>
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <h1 className="text-lg font-bold text-stone-800">전체 주문</h1>
+        <AutoRefresh seconds={20} />
+      </div>
       {orders.length === 0 ? (
         <p className="text-stone-400 text-center py-16">아직 주문이 없어요.</p>
       ) : (

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { roastDateKey, roastDateLabel, todayKstKey } from "@/lib/roasting";
 import RoastingRow from "./RoastingRow";
 import TodayRoast from "./TodayRoast";
+import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +137,10 @@ export default async function RoastingPage() {
 
   return (
     <div>
-      <h1 className="text-lg font-bold text-stone-800 mb-1">로스팅 목록</h1>
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <h1 className="text-lg font-bold text-stone-800">로스팅 목록</h1>
+        <AutoRefresh seconds={30} />
+      </div>
       <p className="text-xs text-stone-400 mb-4">
         월·수 주문 마감 → 화·목 로스팅. 화요일 = 목~월 주문 / 목요일 = 화·수 주문.
         완료 누르면 목록에서 사라져요.

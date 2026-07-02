@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { won, ym, ymLabel } from "@/lib/format";
 import { parseMeta } from "@/lib/acctMeta";
 import { DEFAULT_VAT } from "@/lib/vat";
+import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -97,9 +98,12 @@ export default async function AdminDashboard() {
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-4">
+      <div className="flex items-baseline justify-between mb-4 gap-2">
         <h1 className="text-lg font-bold text-stone-800">대시보드</h1>
-        <span className="text-sm text-stone-400">{ymLabel(thisYm)} 기준</span>
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm text-stone-400">{ymLabel(thisYm)} 기준</span>
+          <AutoRefresh seconds={30} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 mb-3">
