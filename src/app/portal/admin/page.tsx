@@ -16,9 +16,21 @@ export default async function AdminDashboard() {
   const admin = createAdminClient();
   const thisYm = ym(new Date().toISOString());
 
-  const { data: orderData } = await admin
-    .from("b2b_orders")
-    .select("id, account_id, total_amount, created_at, status");
+  // 서로 독립된 쿼리 4개는 동시에 실행 (순차 → 병렬)
+  const [
+    { data: orderData },
+    { data: acctRows },
+    { data: prodData },
+    { data: msgData },
+  ] = await Promise.all([
+    admin
+      .from("b2b_orders")
+      .select("id, account_id, total_amount, created_at, status"),
+    admin.from("b2b_accounts").select("id, role, memo"),
+    admin.from("products").select("name").eq("active", true).order("sort_order"),
+    admin.from("b2b_messages").select("sender, read_by_admin"),
+  ]);
+
   const orders = (orderData ?? []) as {
     id: string;
     account_id: string;
@@ -31,9 +43,6 @@ export default async function AdminDashboard() {
   const pendingCount = orders.filter((o) => o.status === "requested").length;
 
   // 거래처별 부가세 모드 (현금 매출 분리용)
-  const { data: acctRows } = await admin
-    .from("b2b_accounts")
-    .select("id, role, memo");
   const vatMap = new Map(
     (acctRows ?? []).map((a) => [
       a.id as string,
@@ -64,17 +73,9 @@ export default async function AdminDashboard() {
     }
   }
 
-  const { data: prodData } = await admin
-    .from("products")
-    .select("name")
-    .eq("active", true)
-    .order("sort_order");
   const products = (prodData ?? []).map((p) => p.name as string);
   const monthTotalQty = [...qtyMap.values()].reduce((s, v) => s + v, 0);
 
-  const { data: msgData } = await admin
-    .from("b2b_messages")
-    .select("sender, read_by_admin");
   const unread = (msgData ?? []).filter(
     (m) => m.sender === "buyer" && !m.read_by_admin
   ).length;

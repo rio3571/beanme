@@ -13,14 +13,13 @@ export default async function PortalLayout({
   if (!account) return <>{children}</>;
 
   const isAdmin = account.role === "admin";
-  const nav = isAdmin
+  // 왼쪽(운영) / 오른쪽(관리) 그룹 분리
+  const leftNav = isAdmin
     ? [
         { href: "/portal/admin", label: "대시보드" },
         { href: "/portal/admin/orders", label: "주문" },
         { href: "/portal/admin/roasting", label: "로스팅" },
-        { href: "/portal/admin/profit", label: "수익관리" },
         { href: "/portal/admin/messages", label: "문의" },
-        { href: "/portal/admin/accounts", label: "거래처 관리" },
       ]
     : [
         { href: "/portal", label: "홈" },
@@ -28,6 +27,12 @@ export default async function PortalLayout({
         { href: "/portal/order", label: "주문하기" },
         { href: "/portal/inquiry", label: "문의" },
       ];
+  const rightNav = isAdmin
+    ? [
+        { href: "/portal/admin/profit", label: "수익관리" },
+        { href: "/portal/admin/accounts", label: "거래처 관리" },
+      ]
+    : [];
 
   return (
     <div className="min-h-screen flex flex-col bg-stone-100">
@@ -49,8 +54,8 @@ export default async function PortalLayout({
               </button>
             </form>
           </div>
-          <nav className="flex gap-1.5 overflow-x-auto pb-2 -mt-0.5">
-            {nav.map((n) => (
+          <nav className="flex items-center gap-1.5 overflow-x-auto pb-2 -mt-0.5">
+            {leftNav.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
@@ -59,6 +64,19 @@ export default async function PortalLayout({
                 {n.label}
               </Link>
             ))}
+            {rightNav.length > 0 && (
+              <div className="ml-auto flex items-center gap-1.5 pl-3">
+                {rightNav.map((n) => (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className="flex-shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200"
+                  >
+                    {n.label}
+                  </Link>
+                ))}
+              </div>
+            )}
           </nav>
         </div>
       </header>

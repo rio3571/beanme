@@ -28,28 +28,27 @@ export default async function RoastingPage() {
 
   const admin = createAdminClient();
 
-  // 로스팅 대상: 취소·완료 제외 (완료 누르면 목록에서 사라짐)
-  const { data: orderData } = await admin
-    .from("b2b_orders")
-    .select("id, account_id, status, created_at")
-    .not("status", "in", "(canceled,done)")
-    .order("created_at", { ascending: false })
-    .limit(300);
+  // orders(취소·완료 제외) + accounts + products 동시 실행
+  const [{ data: orderData }, { data: acctData }, { data: prodData }] =
+    await Promise.all([
+      admin
+        .from("b2b_orders")
+        .select("id, account_id, status, created_at")
+        .not("status", "in", "(canceled,done)")
+        .order("created_at", { ascending: false })
+        .limit(300),
+      admin.from("b2b_accounts").select("id, company_name"),
+      admin
+        .from("products")
+        .select("name")
+        .eq("active", true)
+        .order("sort_order"),
+    ]);
   const orders = (orderData ?? []) as OrderRow[];
 
-  const { data: acctData } = await admin
-    .from("b2b_accounts")
-    .select("id, company_name");
   const nameMap = new Map(
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])
   );
-
-  // 품목 컬럼 순서 (활성 상품 기준)
-  const { data: prodData } = await admin
-    .from("products")
-    .select("name")
-    .eq("active", true)
-    .order("sort_order");
   const columns: string[] = (prodData ?? []).map((p) => p.name as string);
 
   const ids = orders.map((o) => o.id);

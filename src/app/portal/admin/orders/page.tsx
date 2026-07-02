@@ -35,16 +35,17 @@ export default async function AdminOrdersPage() {
   if (me.role !== "admin") redirect("/portal/order");
 
   const admin = createAdminClient();
-  const { data: orderData } = await admin
-    .from("b2b_orders")
-    .select("id, order_no, account_id, status, total_amount, note, created_at")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  // orders + accounts 동시 실행
+  const [{ data: orderData }, { data: acctData }] = await Promise.all([
+    admin
+      .from("b2b_orders")
+      .select("id, order_no, account_id, status, total_amount, note, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    admin.from("b2b_accounts").select("id, company_name, memo"),
+  ]);
   const orders = (orderData ?? []) as OrderRow[];
 
-  const { data: acctData } = await admin
-    .from("b2b_accounts")
-    .select("id, company_name, memo");
   const nameMap = new Map(
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])
   );
@@ -57,28 +58,28 @@ export default async function AdminOrdersPage() {
 
   const ids = orders.map((o) => o.id);
   let items: ItemRow[] = [];
+  let comments: (CommentRow & { order_id: string })[] = [];
   if (ids.length > 0) {
-    const { data: itemData } = await admin
-      .from("b2b_order_items")
-      .select("order_id, product_name, unit, qty, line_amount")
-      .in("order_id", ids);
+    // items + comments 동시 실행
+    const [{ data: itemData }, { data: cData }] = await Promise.all([
+      admin
+        .from("b2b_order_items")
+        .select("order_id, product_name, unit, qty, line_amount")
+        .in("order_id", ids),
+      admin
+        .from("b2b_order_comments")
+        .select("id, order_id, sender, body, created_at")
+        .in("order_id", ids)
+        .order("created_at", { ascending: true }),
+    ]);
     items = (itemData ?? []) as ItemRow[];
+    comments = (cData ?? []) as (CommentRow & { order_id: string })[];
   }
   const byOrder = new Map<string, ItemRow[]>();
   for (const it of items) {
     const arr = byOrder.get(it.order_id) ?? [];
     arr.push(it);
     byOrder.set(it.order_id, arr);
-  }
-
-  let comments: (CommentRow & { order_id: string })[] = [];
-  if (ids.length > 0) {
-    const { data: cData } = await admin
-      .from("b2b_order_comments")
-      .select("id, order_id, sender, body, created_at")
-      .in("order_id", ids)
-      .order("created_at", { ascending: true });
-    comments = (cData ?? []) as (CommentRow & { order_id: string })[];
   }
   const cByOrder = new Map<string, CommentRow[]>();
   for (const c of comments) {
