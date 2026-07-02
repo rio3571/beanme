@@ -4,6 +4,7 @@ import { getMyAccount } from "@/lib/portal";
 import { loadStatement } from "@/lib/statement";
 import { ymLabel } from "@/lib/format";
 import StatementView from "@/components/StatementView";
+import IssueTaxButton from "./IssueTaxButton";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,8 @@ export default async function AdminStatementPage({
           ))}
         </div>
       )}
+
+      <IssueTaxButton accountId={id} ym={selectedYm} />
 
       <StatementView
         buyer={buyer}
