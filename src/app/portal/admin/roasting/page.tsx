@@ -156,6 +156,8 @@ export default async function RoastingPage() {
       <TodayRoast
         columns={columns}
         dateLabel={roastDateLabel(roastAnchor)}
+        batchKey={roastAnchor}
+        monthKey={today.slice(0, 7)}
         isToday={roastAnchor === today}
         rows={todayOrderRows}
       />
