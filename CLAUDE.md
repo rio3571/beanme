@@ -177,7 +177,26 @@ data/
 **로스팅 수기 추가** — `roasting/TodayRoast.tsx`(클라이언트, localStorage `beanme_roast_manual`).
 - 오늘 배치를 클라이언트 표로 → 포털 주문행 + **수기행** 한 표에. 거래처+품목(산·바다·노을·디카페인) 한 번에 입력. 합계=주문+수기. DB 변경 없음(브라우저 저장).
 
+### 2026-07-02 세금계산서(팝빌) + 성능 + 실시간 + 수익관리 임베드
+
+**전자세금계산서 — 팝빌 연동 (테스트 성공, 운영전환 남음)**
+- `popbill` SDK. `lib/popbill.ts`(config/getBalance/registIssue, IsTest), `next.config` serverExternalPackages, `types/popbill.d.ts`.
+- 발행 액션 `statement/actions.ts` `issueTaxInvoice(accountId, ym)` + 버튼 `IssueTaxButton`(거래명세서 화면). 부가세 net→10% 세액, detailList 품목, 현금/정보부족/공급자 업태종목 미입력 시 차단.
+- 거래처 세금정보 입력 `TaxInfoForm`(사업자번호·대표자·업태·종목·주소·세금이메일; memo `tax.*` + business_no/address 컬럼, 액션 `updateAccountTax`). 공급자 `supplier.ts`에 업태 제조업/종목 커피 가공업 + 등록증 주소.
+- env(서버전용, gitignore + Vercel): `POPBILL_LINK_ID`(HEEYEONJAE), `POPBILL_SECRET_KEY`(⚠️운영전환 전 재발급), `POPBILL_CORP_NUM`, `POPBILL_IS_TEST=true`.
+- ✅ **테스트베드 발행 성공 검증됨**(팝빌 매출문서함 확인). invoicerCorpNum=env(POPBILL_CORP_NUM).
+- ⚠️ 테스트는 팝빌 공용 테스트인증서(KTNET, 사업자 **123-45-67890**)로 함 → 현재 env corpNum=1234567890. **운영전환 시**: corpNum 희연재 184-87-02137 + IsTest=false + 실 SecretKey + 희연재 **전자세금계산서용 공동인증서**(은행전용 불가, 발급 필요) + 팝빌 운영전환 신청 + 포인트충전(건당 200원).
+
+**성능**: 관리자 대시보드/주문/로스팅/거래처주문내역 DB쿼리 순차→`Promise.all` 병렬. **Supabase Pro 전환됨**(콜드스타트 제거). 체감 개선 확인.
+
+**실시간**: `components/AutoRefresh.tsx`(router.refresh 주기 갱신, 토글, 탭숨김시 정지) → 대시보드30s/주문20s/로스팅30s.
+
+**수익관리 메뉴**: 관리자 전용 `/portal/admin/profit` — factory-profit.vercel.app iframe 임베드(가운데 컨테이너 폭, calc(100vh-130px)). 상단 네비 우측 그룹(수익관리·거래처 관리, 앰버)으로 분리.
+
 ### 미완료 / 다음
+- ⏳ 세금계산서 **운영전환**(위 ⚠️ 참고) — 인증서 발급이 관건.
+- ⏳ 수익관리를 **실주문 데이터와 연동**해 매출·원가·수익 자동계산(현재는 엑셀 업로드 툴 임베드만). 원두주문=희연재 매출.
+- ⏳ (선택) 브랜드 도메인+이메일(네이버웍스 무료 등) / 사이트 커스텀 도메인.
 - ⏳ `supabase_bank_info.sql` (입금계좌 컬럼) **사용자 Run 대기** — 실행 전엔 계좌 기능 비활성(코드는 안 깨짐).
 - 3단계: **전자세금계산서 자동발행**(팝빌 등 연동) — 거래명세서는 완료, 세금계산서는 추후.
 - (선택) 부가세 매출에 세금포함(×1.1) 금액 병기 / 이월 '보냈어요-비우기' 버튼 / 수기 날짜별 자동비우기.

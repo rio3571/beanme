@@ -43,10 +43,12 @@ export default function TodayRoast({
   columns,
   dateLabel,
   rows,
+  isToday,
 }: {
   columns: string[];
   dateLabel: string;
   rows: OrderRow[];
+  isToday: boolean;
 }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -100,7 +102,7 @@ export default function TodayRoast({
         <div className="flex items-baseline gap-2">
           <h2 className="font-bold text-stone-800">{dateLabel} 로스팅</h2>
           <span className="text-xs font-bold text-amber-700 bg-amber-200 rounded-full px-2 py-0.5">
-            오늘
+            {isToday ? "오늘" : "다음 배치"}
           </span>
         </div>
         <span className="text-sm font-bold text-stone-700">총 {totalKg}kg</span>
@@ -174,7 +176,7 @@ export default function TodayRoast({
                   colSpan={columns.length + 2}
                   className="px-3 py-5 text-center text-sm text-stone-400"
                 >
-                  오늘 로스팅할 주문이 없어요. 아래에서 수기로 추가할 수 있어요.
+                  이 배치에 아직 주문이 없어요. 아래에서 수기로 추가할 수 있어요.
                 </td>
               </tr>
             )}

@@ -36,6 +36,29 @@ export function roastDateKey(ts: string): string {
   )}`;
 }
 
+/**
+ * 오늘(KST) 기준, 가장 가까운 로스팅일(화·목) 'YYYY-MM-DD'.
+ * 오늘이 화·목이면 오늘, 아니면 다음 화 또는 목.
+ *  - 화(2)·목(4) → 오늘 / 수(3) → 이번주 목 / 그 외(금·토·일·월) → 다음 화
+ * 수기 입력·현재 배치의 기준 날짜로 사용해 화·목 주기에 맞춘다.
+ */
+export function nextRoastDayKey(nowIso: string): string {
+  const k = kstShift(nowIso);
+  const w = k.getUTCDay(); // KST 요일
+  let add: number;
+  if (w === 2 || w === 4) add = 0;
+  else if (w === 3) add = 1;
+  else add = ((2 - w) + 7) % 7; // 금=+4, 토=+3, 일=+2, 월=+1 → 다음 화
+  const base = new Date(
+    Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate())
+  );
+  base.setUTCDate(base.getUTCDate() + add);
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${base.getUTCFullYear()}-${p(base.getUTCMonth() + 1)}-${p(
+    base.getUTCDate()
+  )}`;
+}
+
 const WD = ["일", "월", "화", "수", "목", "금", "토"];
 
 /** 'YYYY-MM-DD' → 'M월 D일 (화)' */

@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { roastDateKey, roastDateLabel, todayKstKey } from "@/lib/roasting";
+import {
+  roastDateKey,
+  roastDateLabel,
+  todayKstKey,
+  nextRoastDayKey,
+} from "@/lib/roasting";
 import RoastingRow from "./RoastingRow";
 import TodayRoast from "./TodayRoast";
 import AutoRefresh from "@/components/AutoRefresh";
@@ -112,13 +117,15 @@ export default async function RoastingPage() {
   // 날짜 정렬: 오늘 이후(가까운 순) → 지난(최근 순)
   const keys = [...batchMap.keys()].sort();
   const today = todayKstKey(new Date().toISOString());
+  // 수기·현재 배치 기준일: 가장 가까운 화/목 로스팅일 (오늘이 화·목이면 오늘)
+  const roastAnchor = nextRoastDayKey(new Date().toISOString());
   const ordered = [
     ...keys.filter((k) => k >= today),
     ...keys.filter((k) => k < today).reverse(),
   ];
 
-  // 오늘 로스팅 배치 → 클라이언트 표(수기 추가 포함)로 렌더
-  const todayBatch = batchMap.get(today);
+  // 현재 로스팅 배치(다음 화/목) → 클라이언트 표(수기 추가 포함)로 렌더
+  const todayBatch = batchMap.get(roastAnchor);
   const todayOrderRows = todayBatch
     ? todayBatch.order.map((aid) => {
         const a = todayBatch.accounts.get(aid)!;
@@ -133,7 +140,7 @@ export default async function RoastingPage() {
         };
       })
     : [];
-  const otherKeys = ordered.filter((k) => k !== today);
+  const otherKeys = ordered.filter((k) => k !== roastAnchor);
 
   return (
     <div>
@@ -148,7 +155,8 @@ export default async function RoastingPage() {
 
       <TodayRoast
         columns={columns}
-        dateLabel={roastDateLabel(today)}
+        dateLabel={roastDateLabel(roastAnchor)}
+        isToday={roastAnchor === today}
         rows={todayOrderRows}
       />
 
