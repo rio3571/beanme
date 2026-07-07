@@ -34,12 +34,18 @@ export default async function RoastingPage() {
 
   const admin = createAdminClient();
 
-  // orders(취소·완료 제외) + accounts + products + 수기 동시 실행
+  // 월합산용 기준: 최근 약 4개월 주문(취소만 제외, 완료 포함)
+  const monthAggFromIso = new Date(
+    Date.now() - 130 * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  // orders(배치용, 취소·완료 제외) + accounts + products + 수기 + 월합산주문 동시 실행
   const [
     { data: orderData },
     { data: acctData },
     { data: prodData },
     { data: manualData },
+    { data: monthOrderData },
   ] = await Promise.all([
     admin
       .from("b2b_orders")
@@ -54,6 +60,12 @@ export default async function RoastingPage() {
       .eq("active", true)
       .order("sort_order"),
     admin.from("roast_manual").select("*"),
+    admin
+      .from("b2b_orders")
+      .select("id, created_at")
+      .neq("status", "canceled")
+      .gte("created_at", monthAggFromIso)
+      .limit(1000),
   ]);
   const orders = (orderData ?? []) as OrderRow[];
 
@@ -87,6 +99,27 @@ export default async function RoastingPage() {
     arr.push(it);
     itemsByOrder.set(it.order_id, arr);
     if (!columns.includes(it.product_name)) columns.push(it.product_name); // 비활성 상품 보강
+  }
+
+  // 월합산: 로스팅 월별·품목별 주문 합계 (완료 포함)
+  const monthOrderDate = new Map(
+    (monthOrderData ?? []).map((o) => [o.id as string, o.created_at as string])
+  );
+  const monthOrderIds = [...monthOrderDate.keys()];
+  const orderMonthTotals: Record<string, Record<string, number>> = {};
+  if (monthOrderIds.length > 0) {
+    const { data: mItems } = await admin
+      .from("b2b_order_items")
+      .select("order_id, product_name, qty")
+      .in("order_id", monthOrderIds);
+    for (const it of mItems ?? []) {
+      const created = monthOrderDate.get(it.order_id as string);
+      if (!created) continue;
+      const mon = roastDateKey(created).slice(0, 7); // 로스팅일의 'YYYY-MM'
+      const mm = (orderMonthTotals[mon] ??= {});
+      const pn = it.product_name as string;
+      mm[pn] = (mm[pn] ?? 0) + ((it.qty as number) ?? 0);
+    }
   }
 
   // 로스팅 날짜 → 거래처 → {품목별 수량, 주문ids, 상태}
@@ -176,6 +209,7 @@ export default async function RoastingPage() {
         isToday={roastAnchor === today}
         rows={todayOrderRows}
         manualEntries={manualEntries}
+        orderMonthTotals={orderMonthTotals}
       />
 
       {otherKeys.length > 0 && (

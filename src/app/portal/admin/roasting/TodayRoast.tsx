@@ -41,6 +41,7 @@ export default function TodayRoast({
   isToday,
   rows,
   manualEntries,
+  orderMonthTotals,
 }: {
   columns: string[];
   dateLabel: string;
@@ -49,6 +50,7 @@ export default function TodayRoast({
   isToday: boolean;
   rows: OrderRow[];
   manualEntries: Entry[]; // 서버 저장 수기 (어디서든 동일)
+  orderMonthTotals: Record<string, Record<string, number>>; // 월별·품목별 포털 주문 합계
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -117,10 +119,19 @@ export default function TodayRoast({
       .filter((e) => (e.roastDate || monthKey + "-01").startsWith(month))
       .sort((a, b) => (a.roastDate || "").localeCompare(b.roastDate || ""));
   }, [entries, month, monthKey]);
-  const monthTotals = columns.map((c) =>
-    monthEntries.reduce((s, e) => s + (e.qtys[c] ?? 0), 0)
+  // 월합산 = 포털 주문(그 달) + 수기(그 달)
+  const orderMonth = orderMonthTotals[month] ?? {};
+  const monthTotals = columns.map(
+    (c) =>
+      (orderMonth[c] ?? 0) +
+      monthEntries.reduce((s, e) => s + (e.qtys[c] ?? 0), 0)
   );
   const monthKg = monthTotals.reduce((s, v) => s + v, 0);
+  const orderMonthKg = Object.values(orderMonth).reduce((s, v) => s + v, 0);
+  const manualMonthKg = monthEntries.reduce(
+    (s, e) => s + Object.values(e.qtys).reduce((x, y) => x + y, 0),
+    0
+  );
   const monthDoneKg = monthEntries
     .filter((e) => e.done)
     .reduce((s, e) => s + Object.values(e.qtys).reduce((x, y) => x + y, 0), 0);
@@ -317,7 +328,7 @@ export default function TodayRoast({
           className="w-full flex items-center justify-between px-4 py-3 bg-stone-50 hover:bg-stone-100 text-left"
         >
           <span className="font-semibold text-stone-700 text-sm">
-            📋 월마감 · 수기 로스팅 내역
+            📋 월마감 · 로스팅 합산 (주문 + 수기)
           </span>
           <span className="text-xs text-stone-500">
             {monthEntries.length}건 · {monthKg}kg{" "}
@@ -345,14 +356,17 @@ export default function TodayRoast({
                   ›
                 </button>
               </div>
-              <div className="text-xs text-stone-500">
-                완료 {monthDoneKg}kg / 총 {monthKg}kg
+              <div className="text-xs text-right leading-tight">
+                <div className="font-bold text-stone-700">총 {monthKg}kg</div>
+                <div className="text-stone-400">
+                  주문 {orderMonthKg} + 수기 {manualMonthKg}kg
+                </div>
               </div>
             </div>
 
-            {monthEntries.length === 0 ? (
+            {monthEntries.length === 0 && orderMonthKg === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-stone-400">
-                이 달 수기 내역이 없어요.
+                이 달 내역이 없어요.
               </div>
             ) : (
               <>
@@ -421,6 +435,16 @@ export default function TodayRoast({
                           </td>
                         </tr>
                       ))}
+                      {monthEntries.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={columns.length + 4}
+                            className="px-3 py-3 text-center text-xs text-stone-400"
+                          >
+                            이 달 수기 내역은 없어요 · 아래 합계는 포털 주문 기준
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-stone-200 bg-stone-50">
@@ -446,7 +470,7 @@ export default function TodayRoast({
 
                 <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-stone-100">
                   <span className="text-xs text-stone-400">
-                    체크로 완료 표시 · 정산 끝나면 비우기
+                    체크·비우기는 수기만 (포털 주문은 유지)
                   </span>
                   <button
                     onClick={clearMonth}
