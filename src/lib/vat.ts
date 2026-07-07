@@ -1,5 +1,6 @@
 // 거래처별 부가세 처리 모드.
-// 저장된 단가/금액은 항상 '공급가(net)' 기준. 모드는 표시·합계 계산에만 적용.
+// 입력한 단가의 의미가 모드별로 다름: 별도=공급가 / 포함=부가세 포함가(최종) / 현금=현금가(최종).
+// 표시·합계는 vatAmounts/displayUnit 에서 모드에 맞게 계산.
 export type VatMode = "excluded" | "included" | "cash";
 
 export const VAT_MODES: VatMode[] = ["excluded", "included", "cash"];
@@ -21,20 +22,30 @@ export function isVatMode(v: unknown): v is VatMode {
   return v === "excluded" || v === "included" || v === "cash";
 }
 
-/** 거래처 화면에 노출할 '단가' (입력단가 = 공급가 net 기준).
- *  - 포함: 부가세 포함가(net×1.1)로 노출
- *  - 별도/현금: 공급가 그대로 노출 */
-export function displayUnit(net: number, mode: VatMode): number {
-  return mode === "included" ? Math.round(net * 1.1) : Math.round(net);
+/** 거래처 화면에 노출할 '단가'. 입력한 단가를 그대로 노출.
+ *  (별도=공급가, 포함=부가세 포함가, 현금=현금가 — 모두 입력값 그대로) */
+export function displayUnit(unit: number, _mode: VatMode): number {
+  return Math.round(unit);
 }
 
-/** 공급가 합계(net total) → {공급가, 부가세, 합계}. 현금은 부가세 0. */
-export function vatAmounts(netTotal: number, mode: VatMode): {
+/** 입력단가 합계 → {공급가, 부가세, 합계}.
+ *  - 별도: 합계 = 입력가 + 10%   (입력가 = 공급가)
+ *  - 포함: 합계 = 입력가          (입력가 = 부가세 포함가, 공급가 = 입력가/1.1)
+ *  - 현금: 합계 = 입력가, 부가세 0 */
+export function vatAmounts(base: number, mode: VatMode): {
   supply: number;
   vat: number;
   total: number;
 } {
-  const supply = Math.round(netTotal);
-  const vat = mode === "cash" ? 0 : Math.round(supply * 0.1);
-  return { supply, vat, total: supply + vat };
+  const n = Math.round(base);
+  if (mode === "included") {
+    const supply = Math.round(n / 1.1);
+    return { supply, vat: n - supply, total: n };
+  }
+  if (mode === "cash") {
+    return { supply: n, vat: 0, total: n };
+  }
+  // excluded (부가세 별도)
+  const vat = Math.round(n * 0.1);
+  return { supply: n, vat, total: n + vat };
 }
