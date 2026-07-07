@@ -34,23 +34,38 @@ export default async function RoastingPage() {
 
   const admin = createAdminClient();
 
-  // orders(취소·완료 제외) + accounts + products 동시 실행
-  const [{ data: orderData }, { data: acctData }, { data: prodData }] =
-    await Promise.all([
-      admin
-        .from("b2b_orders")
-        .select("id, account_id, status, created_at")
-        .not("status", "in", "(canceled,done)")
-        .order("created_at", { ascending: false })
-        .limit(300),
-      admin.from("b2b_accounts").select("id, company_name"),
-      admin
-        .from("products")
-        .select("name")
-        .eq("active", true)
-        .order("sort_order"),
-    ]);
+  // orders(취소·완료 제외) + accounts + products + 수기 동시 실행
+  const [
+    { data: orderData },
+    { data: acctData },
+    { data: prodData },
+    { data: manualData },
+  ] = await Promise.all([
+    admin
+      .from("b2b_orders")
+      .select("id, account_id, status, created_at")
+      .not("status", "in", "(canceled,done)")
+      .order("created_at", { ascending: false })
+      .limit(300),
+    admin.from("b2b_accounts").select("id, company_name"),
+    admin
+      .from("products")
+      .select("name")
+      .eq("active", true)
+      .order("sort_order"),
+    admin.from("roast_manual").select("*"),
+  ]);
   const orders = (orderData ?? []) as OrderRow[];
+
+  // 수기(서버 저장) → TodayRoast Entry 형태로 변환
+  const manualEntries = (manualData ?? []).map((m) => ({
+    id: m.id as string,
+    account: (m.account as string) ?? "",
+    qtys: (m.qtys as Record<string, number>) ?? {},
+    roastDate: (m.roast_date as string) ?? "",
+    done: m.done === true,
+    ts: (m.created_at as string) ?? "",
+  }));
 
   const nameMap = new Map(
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])
@@ -160,6 +175,7 @@ export default async function RoastingPage() {
         monthKey={today.slice(0, 7)}
         isToday={roastAnchor === today}
         rows={todayOrderRows}
+        manualEntries={manualEntries}
       />
 
       {otherKeys.length > 0 && (

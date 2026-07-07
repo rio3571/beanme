@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import RoastingRow from "./RoastingRow";
+import {
+  addManualRoast,
+  removeManualRoast,
+  setManualDone,
+  clearManualMonth,
+  migrateManualRoast,
+} from "./actions";
 
 type OrderRow = {
   accountId: string;
@@ -19,32 +27,6 @@ type Entry = {
   ts: string; // 생성 ISO
 };
 
-const KEY = "beanme_roast_manual";
-
-function normalize(raw: unknown): Entry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((e, i): Entry | null => {
-      if (!e || typeof e !== "object") return null;
-      const o = e as Record<string, unknown>;
-      const base = {
-        id: String(o.id ?? i),
-        account: String(o.account ?? ""),
-        roastDate: typeof o.roastDate === "string" ? o.roastDate : "",
-        done: o.done === true,
-        ts: typeof o.ts === "string" ? o.ts : "",
-      };
-      if (o.qtys && typeof o.qtys === "object") {
-        return { ...base, qtys: o.qtys as Record<string, number> };
-      }
-      if (typeof o.product === "string") {
-        return { ...base, qtys: { [o.product]: Number(o.qty) || 0 } };
-      }
-      return null;
-    })
-    .filter((x): x is Entry => x !== null);
-}
-
 function fmtDay(key: string): string {
   const [, m, d] = key.split("-");
   if (!m || !d) return "날짜미상";
@@ -58,6 +40,7 @@ export default function TodayRoast({
   monthKey,
   isToday,
   rows,
+  manualEntries,
 }: {
   columns: string[];
   dateLabel: string;
@@ -65,24 +48,35 @@ export default function TodayRoast({
   monthKey: string; // 이번 달 'YYYY-MM'
   isToday: boolean;
   rows: OrderRow[];
+  manualEntries: Entry[]; // 서버 저장 수기 (어디서든 동일)
 }) {
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [account, setAccount] = useState("");
   const [vals, setVals] = useState<Record<string, string>>({});
   const [showMonth, setShowMonth] = useState(false);
   const [month, setMonth] = useState(monthKey);
 
+  const entries = manualEntries;
+
+  // 기존 localStorage 수기 → 서버로 1회 이전 (기기별 최초 진입 시)
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) setEntries(normalize(JSON.parse(raw)));
+      const raw = localStorage.getItem("beanme_roast_manual");
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length > 0) {
+        migrateManualRoast(arr).then(() => {
+          localStorage.removeItem("beanme_roast_manual");
+          router.refresh();
+        });
+      } else {
+        localStorage.removeItem("beanme_roast_manual");
+      }
     } catch {}
-    setLoaded(true);
-  }, []);
-  useEffect(() => {
-    if (loaded) localStorage.setItem(KEY, JSON.stringify(entries));
-  }, [entries, loaded]);
+  }, [router]);
+
+  const refresh = () => startTransition(() => router.refresh());
 
   function add() {
     const qtys: Record<string, number> = {};
@@ -91,27 +85,17 @@ export default function TodayRoast({
       if (q > 0) qtys[p] = q;
     }
     if (Object.keys(qtys).length === 0) return;
-    setEntries((prev) => [
-      ...prev,
-      {
-        id: `m${Date.now()}-${prev.length}`,
-        account: account.trim(),
-        qtys,
-        roastDate: batchKey,
-        done: false,
-        ts: new Date().toISOString(),
-      },
-    ]);
+    const acc = account.trim();
     setAccount("");
     setVals({});
+    addManualRoast({ account: acc, qtys, roastDate: batchKey }).then(refresh);
   }
   function remove(id: string) {
-    setEntries((p) => p.filter((e) => e.id !== id));
+    removeManualRoast(id).then(refresh);
   }
   function toggleDone(id: string) {
-    setEntries((p) =>
-      p.map((e) => (e.id === id ? { ...e, done: !e.done } : e))
-    );
+    const cur = entries.find((e) => e.id === id);
+    setManualDone(id, !cur?.done).then(refresh);
   }
 
   // 현재 배치에 속한 수기 (배치일 일치 또는 날짜없는 레거시)
@@ -157,8 +141,7 @@ export default function TodayRoast({
       )
     )
       return;
-    const ids = new Set(monthEntries.map((e) => e.id));
-    setEntries((p) => p.filter((e) => !ids.has(e.id)));
+    clearManualMonth(month).then(refresh);
   }
 
   return (
@@ -292,7 +275,7 @@ export default function TodayRoast({
         {/* 수기 추가 입력 */}
         <div className="border-t border-stone-200 bg-white p-3">
           <div className="text-xs font-semibold text-stone-500 mb-2">
-            ✍️ 수기 추가 (전화·카톡 등 다른 경로 주문 · 이 브라우저에만 저장)
+            ✍️ 수기 추가 (전화·카톡 등 다른 경로 주문 · 서버 저장 → 폰·PC 어디서든 동일)
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <input
