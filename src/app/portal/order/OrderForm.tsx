@@ -35,7 +35,6 @@ export default function OrderForm({
   // 저장 단가는 공급가(net). 모드에 따라 표시·합계만 달라짐.
   const netTotal = items.reduce((s, it) => s + (qty[it.id] || 0) * it.price, 0);
   const amt = vatAmounts(netTotal, vatMode);
-  const total = netTotal;
   const count = items.reduce((s, it) => s + (qty[it.id] || 0), 0);
 
   function setItemQty(id: string, v: number) {
@@ -200,7 +199,7 @@ export default function OrderForm({
           </div>
           <button
             onClick={submit}
-            disabled={submitting || total <= 0}
+            disabled={submitting || count <= 0}
             className="rounded-xl bg-amber-700 text-white font-semibold px-7 py-3 hover:bg-amber-800 disabled:opacity-40"
           >
             {submitting ? "저장 중…" : orderId ? "수정 저장" : "주문하기"}
