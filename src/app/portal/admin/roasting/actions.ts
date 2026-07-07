@@ -15,6 +15,7 @@ export async function addManualRoast(input: {
   account: string;
   qtys: Qtys;
   roastDate: string;
+  amount?: number;
 }): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   const admin = createAdminClient();
@@ -22,6 +23,7 @@ export async function addManualRoast(input: {
     account: (input.account ?? "").trim(),
     qtys: input.qtys ?? {},
     roast_date: input.roastDate,
+    amount: Math.max(0, Math.round(Number(input.amount) || 0)),
   });
   revalidatePath("/portal/admin/roasting");
   return { ok: true };
@@ -63,6 +65,7 @@ export async function migrateManualRoast(
     roastDate?: string;
     done?: boolean;
     ts?: string;
+    amount?: number;
   }[]
 ): Promise<{ ok: boolean; added: number }> {
   if (!(await isAdmin())) return { ok: false, added: 0 };
@@ -77,6 +80,7 @@ export async function migrateManualRoast(
       roast_date: e.roastDate || new Date().toISOString().slice(0, 10),
       done: e.done === true,
       created_at: e.ts || new Date().toISOString(),
+      amount: Math.max(0, Math.round(Number(e.amount) || 0)),
     }));
   if (rows.length > 0) await admin.from("roast_manual").insert(rows);
   revalidatePath("/portal/admin/roasting");

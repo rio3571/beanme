@@ -77,6 +77,7 @@ export default async function RoastingPage() {
     roastDate: (m.roast_date as string) ?? "",
     done: m.done === true,
     ts: (m.created_at as string) ?? "",
+    amount: (m.amount as number) ?? 0,
   }));
 
   const nameMap = new Map(

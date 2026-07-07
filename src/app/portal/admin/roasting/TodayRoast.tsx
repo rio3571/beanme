@@ -25,6 +25,7 @@ type Entry = {
   roastDate: string; // 'YYYY-MM-DD' 배치일
   done: boolean;
   ts: string; // 생성 ISO
+  amount: number; // 매출 금액(원)
 };
 
 function fmtDay(key: string): string {
@@ -56,6 +57,7 @@ export default function TodayRoast({
   const [, startTransition] = useTransition();
   const [account, setAccount] = useState("");
   const [vals, setVals] = useState<Record<string, string>>({});
+  const [amount, setAmount] = useState("");
   const [showMonth, setShowMonth] = useState(false);
   const [month, setMonth] = useState(monthKey);
 
@@ -88,9 +90,13 @@ export default function TodayRoast({
     }
     if (Object.keys(qtys).length === 0) return;
     const acc = account.trim();
+    const amt = Math.max(0, Math.round(Number(amount) || 0));
     setAccount("");
     setVals({});
-    addManualRoast({ account: acc, qtys, roastDate: batchKey }).then(refresh);
+    setAmount("");
+    addManualRoast({ account: acc, qtys, roastDate: batchKey, amount: amt }).then(
+      refresh
+    );
   }
   function remove(id: string) {
     removeManualRoast(id).then(refresh);
@@ -135,6 +141,7 @@ export default function TodayRoast({
   const monthDoneKg = monthEntries
     .filter((e) => e.done)
     .reduce((s, e) => s + Object.values(e.qtys).reduce((x, y) => x + y, 0), 0);
+  const monthManualAmount = monthEntries.reduce((s, e) => s + (e.amount || 0), 0);
 
   function shiftMonth(delta: number) {
     const [y, m] = month.split("-").map(Number);
@@ -212,6 +219,11 @@ export default function TodayRoast({
                     <span className={e.done ? "line-through text-stone-400" : ""}>
                       {e.account || "—"}
                     </span>
+                    {e.amount > 0 && (
+                      <span className="ml-1.5 text-xs font-normal text-stone-400">
+                        {e.amount.toLocaleString()}원
+                      </span>
+                    )}
                   </td>
                   {columns.map((c, i) => (
                     <td
@@ -311,6 +323,19 @@ export default function TodayRoast({
                 />
               </div>
             ))}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-stone-500">금액</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && add()}
+                placeholder="0"
+                className="w-24 h-9 text-right rounded-lg border border-stone-300 px-2 text-sm outline-none focus:border-amber-600"
+              />
+              <span className="text-xs text-stone-400">원</span>
+            </div>
             <button
               onClick={add}
               className="h-9 rounded-lg bg-amber-700 text-white text-sm font-semibold px-5 hover:bg-amber-800"
@@ -388,6 +413,9 @@ export default function TodayRoast({
                             {c}
                           </th>
                         ))}
+                        <th className="px-2 py-2 text-right text-xs font-semibold text-stone-500 whitespace-nowrap">
+                          매출
+                        </th>
                         <th className="px-2 py-2 text-center text-xs font-semibold text-stone-500 whitespace-nowrap">
                           체크
                         </th>
@@ -417,6 +445,9 @@ export default function TodayRoast({
                               )}
                             </td>
                           ))}
+                          <td className="px-2 py-2 text-right text-sm tabular-nums whitespace-nowrap text-stone-700">
+                            {e.amount ? e.amount.toLocaleString() : "·"}
+                          </td>
                           <td className="px-2 py-2 text-center">
                             <input
                               type="checkbox"
@@ -438,7 +469,7 @@ export default function TodayRoast({
                       {monthEntries.length === 0 && (
                         <tr>
                           <td
-                            colSpan={columns.length + 4}
+                            colSpan={columns.length + 5}
                             className="px-3 py-3 text-center text-xs text-stone-400"
                           >
                             이 달 수기 내역은 없어요 · 아래 합계는 포털 주문 기준
@@ -462,6 +493,9 @@ export default function TodayRoast({
                             {t > 0 ? `${t}kg` : "·"}
                           </td>
                         ))}
+                        <td className="px-2 py-2 text-right text-sm font-bold text-stone-800 tabular-nums whitespace-nowrap">
+                          {monthManualAmount.toLocaleString()}원
+                        </td>
                         <td colSpan={2} />
                       </tr>
                     </tfoot>
