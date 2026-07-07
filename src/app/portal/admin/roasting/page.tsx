@@ -70,15 +70,17 @@ export default async function RoastingPage() {
   const orders = (orderData ?? []) as OrderRow[];
 
   // 수기(서버 저장) → TodayRoast Entry 형태로 변환
-  const manualEntries = (manualData ?? []).map((m) => ({
-    id: m.id as string,
-    account: (m.account as string) ?? "",
-    qtys: (m.qtys as Record<string, number>) ?? {},
-    roastDate: (m.roast_date as string) ?? "",
-    done: m.done === true,
-    ts: (m.created_at as string) ?? "",
-    amount: (m.amount as number) ?? 0,
-  }));
+  const manualEntries = (manualData ?? [])
+    .filter((m) => ((m.brand as string) ?? "희연재") !== "푸르파파")
+    .map((m) => ({
+      id: m.id as string,
+      account: (m.account as string) ?? "",
+      qtys: (m.qtys as Record<string, number>) ?? {},
+      roastDate: (m.roast_date as string) ?? "",
+      done: m.done === true,
+      ts: (m.created_at as string) ?? "",
+      amount: (m.amount as number) ?? 0,
+    }));
 
   const nameMap = new Map(
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])

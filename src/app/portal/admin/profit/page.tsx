@@ -3,7 +3,7 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { roastDateKey } from "@/lib/roasting";
 import { mergeConfig } from "@/lib/roastConfig";
-import ProfitView, { type MonthAgg } from "./ProfitView";
+import ProfitView, { type MonthAgg, type PuEntry } from "./ProfitView";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,9 @@ export default async function ProfitPage() {
         .neq("status", "canceled")
         .gte("created_at", fromIso)
         .limit(2000),
-      admin.from("roast_manual").select("qtys, roast_date, amount"),
+      admin
+        .from("roast_manual")
+        .select("id, account, qtys, roast_date, amount, brand"),
     ]);
 
   const config = mergeConfig(cfgRow?.data);
@@ -34,10 +36,14 @@ export default async function ProfitPage() {
   );
   const orderIds = [...orderDate.keys()];
 
-  const monthData: Record<string, MonthAgg> = {};
-  const ensure = (ym: string) =>
-    (monthData[ym] ??= { orderRevenue: 0, manualRevenue: 0, kg: {} });
+  const monthHY: Record<string, MonthAgg> = {};
+  const monthPU: Record<string, MonthAgg> = {};
+  const ensureHY = (ym: string) =>
+    (monthHY[ym] ??= { orderRevenue: 0, manualRevenue: 0, kg: {} });
+  const ensurePU = (ym: string) =>
+    (monthPU[ym] ??= { orderRevenue: 0, manualRevenue: 0, kg: {} });
 
+  // 희연재 = 포털 주문
   if (orderIds.length > 0) {
     const { data: items } = await admin
       .from("b2b_order_items")
@@ -47,31 +53,52 @@ export default async function ProfitPage() {
       const created = orderDate.get(it.order_id as string);
       if (!created) continue;
       const ym = roastDateKey(created).slice(0, 7);
-      const m = ensure(ym);
+      const m = ensureHY(ym);
       m.orderRevenue += (it.line_amount as number) ?? 0;
       const pn = it.product_name as string;
       m.kg[pn] = (m.kg[pn] ?? 0) + ((it.qty as number) ?? 0);
     }
   }
+
+  // 수기: 브랜드별 분리 (푸르파파는 원시 목록도 수집)
+  const puEntries: PuEntry[] = [];
   for (const r of manualRows ?? []) {
     const ym = ((r.roast_date as string) ?? "").slice(0, 7);
     if (!ym) continue;
-    const m = ensure(ym);
-    m.manualRevenue += (r.amount as number) ?? 0;
     const qtys = (r.qtys as Record<string, number>) ?? {};
+    const amount = (r.amount as number) ?? 0;
+    const isPu = ((r.brand as string) ?? "희연재") === "푸르파파";
+    const m = isPu ? ensurePU(ym) : ensureHY(ym);
+    m.manualRevenue += amount;
     for (const [pn, kg] of Object.entries(qtys)) {
       m.kg[pn] = (m.kg[pn] ?? 0) + (kg ?? 0);
+    }
+    if (isPu) {
+      puEntries.push({
+        id: r.id as string,
+        account: (r.account as string) ?? "",
+        qtys,
+        roastDate: (r.roast_date as string) ?? "",
+        amount,
+      });
     }
   }
 
   const kstYm = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7);
-  ensure(kstYm);
-  const months = Object.keys(monthData).sort().reverse();
+  ensureHY(kstYm);
+  ensurePU(kstYm);
+  const months = [
+    ...new Set([...Object.keys(monthHY), ...Object.keys(monthPU)]),
+  ]
+    .sort()
+    .reverse();
 
   return (
     <ProfitView
       config={config}
-      monthData={monthData}
+      monthHY={monthHY}
+      monthPU={monthPU}
+      puEntries={puEntries}
       months={months}
       defaultMonth={kstYm}
     />

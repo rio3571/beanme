@@ -17,6 +17,7 @@ export async function addManualRoast(input: {
   qtys: Qtys;
   roastDate: string;
   amount?: number;
+  brand?: string; // '희연재'(기본) | '푸르파파'
 }): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   const admin = createAdminClient();
@@ -25,8 +26,10 @@ export async function addManualRoast(input: {
     qtys: input.qtys ?? {},
     roast_date: input.roastDate,
     amount: Math.max(0, Math.round(Number(input.amount) || 0)),
+    brand: input.brand === "푸르파파" ? "푸르파파" : "희연재",
   });
   revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/profit");
   return { ok: true };
 }
 
@@ -35,6 +38,7 @@ export async function removeManualRoast(id: string): Promise<{ ok: boolean }> {
   const admin = createAdminClient();
   await admin.from("roast_manual").delete().eq("id", id);
   revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/profit");
   return { ok: true };
 }
 
