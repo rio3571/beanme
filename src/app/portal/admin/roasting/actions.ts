@@ -3,6 +3,7 @@
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { revalidatePath } from "next/cache";
+import type { RoastConfig } from "@/lib/roastConfig";
 
 async function isAdmin() {
   const me = await getMyAccount();
@@ -54,6 +55,20 @@ export async function clearManualMonth(month: string): Promise<{ ok: boolean }> 
   const admin = createAdminClient();
   await admin.from("roast_manual").delete().like("roast_date", `${month}%`);
   revalidatePath("/portal/admin/roasting");
+  return { ok: true };
+}
+
+export async function saveRoastConfig(
+  cfg: RoastConfig
+): Promise<{ ok: boolean }> {
+  if (!(await isAdmin())) return { ok: false };
+  const admin = createAdminClient();
+  await admin.from("roast_config").upsert({
+    id: 1,
+    data: cfg,
+    updated_at: new Date().toISOString(),
+  });
+  revalidatePath("/portal/admin/profit");
   return { ok: true };
 }
 
