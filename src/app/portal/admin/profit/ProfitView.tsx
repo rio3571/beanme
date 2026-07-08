@@ -230,7 +230,9 @@ export default function ProfitView({
           "bg-emerald-50 border-emerald-100",
           brand === "희연재"
             ? `주문 ${won(md.orderRevenue)} + 수기 ${won(md.manualRevenue)}`
-            : `납품 ${won(md.manualRevenue)}`
+            : `공급가 ${won(Math.round(revenue / 1.1))} + 부가세 ${won(
+                revenue - Math.round(revenue / 1.1)
+              )}`
         )}
         {metric(
           "실질이익",
@@ -514,9 +516,14 @@ export default function ProfitView({
             </div>
             {puAuto > 0 && (
               <div className="text-xs text-stone-500 mb-2">
-                판매단가 자동 매출 <b className="text-amber-700">{won(puAuto)}</b>{" "}
+                판매단가 자동 매출 공급가 <b>{won(puAuto)}</b> · 부가세{" "}
+                {won(Math.round(puAuto * 0.1))} ·{" "}
+                <b className="text-amber-700">
+                  부가세 포함 {won(Math.round(puAuto * 1.1))}
+                </b>
                 <span className="text-stone-400">
-                  (매출칸 비우면 자동 적용 · 아래 원가 설정에서 단가 수정)
+                  {" "}
+                  (매출칸 비우면 공급가 기준 자동 적용 · 매출 집계는 부가세 포함)
                 </span>
               </div>
             )}
