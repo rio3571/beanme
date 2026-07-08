@@ -193,9 +193,28 @@ data/
 
 **수익관리 메뉴**: 관리자 전용 `/portal/admin/profit` — factory-profit.vercel.app iframe 임베드(가운데 컨테이너 폭, calc(100vh-130px)). 상단 네비 우측 그룹(수익관리·거래처 관리, 앰버)으로 분리.
 
+### 2026-07-08 로스팅 수익 native화 + 전용품목 + 콜드스타트 제거
+
+**수익관리 native 페이지** (`/portal/admin/profit` — 기존 iframe 대체):
+- `src/lib/roastConfig.ts`: 원가 계산(생두단가·레시피 로스율×1.2·포장재·고정비·판매단가). `RoastConfig` + `DEFAULT_ROAST_CONFIG`(캡처 초기값) + `mergeConfig`.
+- `roast_config` 테이블(단일행 jsonb) — 원가설정 서버저장. 액션 `saveRoastConfig`. 페이지 ⚙️원가설정에서 편집(생두단가/레시피/고정비/포장재/속도/가공비/판매단가).
+- **매출 자동** = 실주문(line_amount) + 수기. **원두원가·포장재·고정비·실질이익·이익률·노동시간** 자동. 월 이동(‹ ›).
+- **브랜드 토글 희연재/푸르파파**: 고정비 share(희연재 hyShare=1/3, 푸르파파 나머지). 푸르파파는 포털주문 없어 **납품 수기 입력**(kg×판매단가 자동매출, `sellPrice` 산17300/바다16280/노을18800/디카페인31500 부가세별도).
+- **거래처별 주문내역 표**(희연재 탭): 월별 거래처×품목 kg + 매출, 합계행.
+- **수기 총금액 입력**(희연재 탭): 로스팅 수기 주문을 수익관리에서 금액 편집(`updateManualAmount`).
+
+**로스팅 수기 서버 이전**: localStorage → `roast_manual` 테이블(account/qtys/roast_date/done/amount/brand). 폰·PC 동기화. 액션: add/remove/setDone/updateAmount/clearMonth/migrate. **월합산 = 주문+수기**.
+- `roast_manual` 컬럼 순차 추가(ALTER): `amount`, `brand`('희연재' 기본). 로스팅 목록은 brand=희연재만 표시.
+
+**거래처 전용 판매품목(전용 블렌드)**: `products.owner_account_id`(uuid, null=공용). 관리자 거래처상세 `CustomProductForm`(추가/가격수정/삭제). 주문/수정화면은 공용+본인전용(`.or(owner_account_id.is.null,eq)`), 대시보드/로스팅 기본컬럼은 공용만(`.is null`).
+
+**VAT included 버그 수정**(`src/lib/vat.ts`): 별도=공급가/포함=최종가/현금=최종가. **0원 주문 허용**(OrderForm `disabled`를 total→count).
+
+**콜드스타트 제거**: Vercel **Pro** 확인. `src/app/api/keepalive/route.ts`(GET, 가벼운 DB핑) + `vercel.json` crons `*/5 * * * *`. 측정: 콜드 1.9s→warm 0.2s, 크론으로 상시 warm. (Supabase Pro=DB, Vercel Pro+Fluid+keepalive=콜드스타트, 서로 다른 레이어)
+
 ### 미완료 / 다음
 - ⏳ 세금계산서 **운영전환**(위 ⚠️ 참고) — 인증서 발급이 관건.
-- ⏳ 수익관리를 **실주문 데이터와 연동**해 매출·원가·수익 자동계산(현재는 엑셀 업로드 툴 임베드만). 원두주문=희연재 매출.
+- ✅ 수익관리 실주문 연동 완료(위 2026-07-08). 원두주문=희연재 매출.
 - ⏳ (선택) 브랜드 도메인+이메일(네이버웍스 무료 등) / 사이트 커스텀 도메인.
 - ⏳ `supabase_bank_info.sql` (입금계좌 컬럼) **사용자 Run 대기** — 실행 전엔 계좌 기능 비활성(코드는 안 깨짐).
 - 3단계: **전자세금계산서 자동발행**(팝빌 등 연동) — 거래명세서는 완료, 세금계산서는 추후.
