@@ -41,6 +41,7 @@ export default async function EditOrderPage({
     .from("products")
     .select("id, name, unit, category, base_price")
     .eq("active", true)
+    .or(`owner_account_id.is.null,owner_account_id.eq.${account.id}`)
     .order("sort_order");
   const products = (prodData ?? []) as ProductRow[];
 

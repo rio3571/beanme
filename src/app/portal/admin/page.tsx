@@ -28,7 +28,12 @@ export default async function AdminDashboard() {
       .from("b2b_orders")
       .select("id, account_id, total_amount, created_at, status"),
     admin.from("b2b_accounts").select("id, role, memo"),
-    admin.from("products").select("name").eq("active", true).order("sort_order"),
+    admin
+      .from("products")
+      .select("name")
+      .eq("active", true)
+      .is("owner_account_id", null)
+      .order("sort_order"),
     admin.from("b2b_messages").select("sender, read_by_admin"),
   ]);
 

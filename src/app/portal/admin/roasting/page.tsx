@@ -58,6 +58,7 @@ export default async function RoastingPage() {
       .from("products")
       .select("name")
       .eq("active", true)
+      .is("owner_account_id", null)
       .order("sort_order"),
     admin.from("roast_manual").select("*"),
     admin

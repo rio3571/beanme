@@ -8,6 +8,66 @@ import { revalidatePath } from "next/cache";
 
 export type CreateAccountState = { error: string | null; ok?: boolean };
 
+// ── 거래처 전용 판매품목 (전용 블렌드 등) ──
+export async function addCustomProduct(
+  accountId: string,
+  name: string,
+  price: number
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const n = String(name).trim();
+  if (!n) return { ok: false, error: "품목명을 입력하세요." };
+  const admin = createAdminClient();
+  const { error } = await admin.from("products").insert({
+    name: n,
+    unit: "kg",
+    category: "blend",
+    base_price: Math.max(0, Math.round(Number(price) || 0)),
+    active: true,
+    owner_account_id: accountId,
+    sort_order: 100,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
+export async function updateCustomProductPrice(
+  productId: string,
+  accountId: string,
+  price: number
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("products")
+    .update({ base_price: Math.max(0, Math.round(Number(price) || 0)) })
+    .eq("id", productId)
+    .not("owner_account_id", "is", null);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
+export async function removeCustomProduct(
+  productId: string,
+  accountId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("products")
+    .update({ active: false })
+    .eq("id", productId)
+    .not("owner_account_id", "is", null);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
 export async function createAccount(
   _prev: CreateAccountState,
   formData: FormData

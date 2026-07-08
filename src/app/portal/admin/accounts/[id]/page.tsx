@@ -9,6 +9,7 @@ import VatForm from "./VatForm";
 import CarryForm from "./CarryForm";
 import NameForm from "./NameForm";
 import TaxInfoForm from "./TaxInfoForm";
+import CustomProductForm from "./CustomProductForm";
 import PasswordResetForm from "./PasswordResetForm";
 import { DEFAULT_VAT } from "@/lib/vat";
 
@@ -56,8 +57,22 @@ export default async function AccountPricePage({
     .from("products")
     .select("id, name, unit, category, base_price")
     .eq("active", true)
+    .is("owner_account_id", null)
     .order("sort_order");
   const products = (prodData ?? []) as ProductRow[];
+
+  // 이 거래처 전용 판매품목
+  const { data: customData } = await admin
+    .from("products")
+    .select("id, name, base_price")
+    .eq("active", true)
+    .eq("owner_account_id", id)
+    .order("sort_order");
+  const customProducts = (customData ?? []).map((p) => ({
+    id: p.id as string,
+    name: p.name as string,
+    price: (p.base_price as number) ?? 0,
+  }));
 
   const { data: priceData } = await admin
     .from("account_prices")
@@ -136,6 +151,7 @@ export default async function AccountPricePage({
       >
         📄 거래내역서 (월별) · PDF 다운로드
       </a>
+      <CustomProductForm accountId={account.id} items={customProducts} />
       <PriceForm accountId={account.id} rows={rows} />
     </div>
   );
