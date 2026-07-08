@@ -95,13 +95,23 @@ export default function ProfitView({
 
   const productNames = cfg.recipes.map((r) => r.name);
 
+  // 판매단가 × kg = 자동 매출
+  const puAuto = productNames.reduce(
+    (s, p) => s + Math.round(Number(puVals[p]) || 0) * (cfg.sellPrice[p] ?? 0),
+    0
+  );
+
   function addPu() {
     const qtys: Record<string, number> = {};
     for (const p of productNames) {
       const q = Math.round(Number(puVals[p]) || 0);
       if (q > 0) qtys[p] = q;
     }
-    const amt = Math.max(0, Math.round(Number(puAmount) || 0));
+    // 매출: 직접 입력 있으면 그 값, 없으면 판매단가 자동 계산
+    const manual = puAmount.trim()
+      ? Math.max(0, Math.round(Number(puAmount) || 0))
+      : 0;
+    const amt = manual || Math.round(puAuto);
     if (Object.keys(qtys).length === 0 && amt === 0) return;
     setPuAccount("");
     setPuVals({});
@@ -320,7 +330,7 @@ export default function ProfitView({
                   value={puAmount}
                   onChange={(e) => setPuAmount(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addPu()}
-                  placeholder="0"
+                  placeholder={puAuto ? puAuto.toLocaleString() : "0"}
                   className="w-24 h-9 text-right rounded-lg border border-stone-300 px-2 text-sm outline-none focus:border-amber-600"
                 />
                 <span className="text-xs text-stone-400">원</span>
@@ -332,6 +342,14 @@ export default function ProfitView({
                 추가
               </button>
             </div>
+            {puAuto > 0 && (
+              <div className="text-xs text-stone-500 mb-2">
+                판매단가 자동 매출 <b className="text-amber-700">{won(puAuto)}</b>{" "}
+                <span className="text-stone-400">
+                  (매출칸 비우면 자동 적용 · 아래 원가 설정에서 단가 수정)
+                </span>
+              </div>
+            )}
 
             {monthPu.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
@@ -550,6 +568,34 @@ export default function ProfitView({
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            {/* 판매단가 (푸르파파) */}
+            <section>
+              <h3 className="font-semibold text-stone-700 text-sm mb-2">
+                💰 판매단가 · 푸르파파 (원/kg · 부가세 별도)
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {productNames.map((p) => (
+                  <label key={p} className="flex items-center gap-2 text-sm">
+                    <span className="w-20 text-stone-500 truncate">{p}</span>
+                    <input
+                      type="number"
+                      value={cfg.sellPrice[p] ?? 0}
+                      onChange={(e) =>
+                        update((c) => {
+                          c.sellPrice[p] = Number(e.target.value) || 0;
+                        })
+                      }
+                      className="flex-1 h-8 text-right rounded-md border border-stone-300 px-2 outline-none focus:border-amber-600"
+                    />
+                    <span className="text-xs text-stone-400">원</span>
+                  </label>
+                ))}
+              </div>
+              <div className="text-xs text-stone-400 mt-1.5">
+                푸르파파 납품 입력 시 kg × 이 단가로 매출 자동 계산돼요.
               </div>
             </section>
 

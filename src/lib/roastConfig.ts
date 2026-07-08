@@ -20,6 +20,7 @@ export type RoastConfig = {
   roastSpeed: number; // 로스팅 kg/h
   packSpeed: number; // 포장 kg/h
   processing: number; // 외주 가공비 (희연재, kg당 원) — 없으면 0
+  sellPrice: Record<string, number>; // 푸르파파 판매단가 (품목→원/kg, 부가세 별도)
 };
 
 // 캡처 기준 초기값 (2026-07)
@@ -43,6 +44,7 @@ export const DEFAULT_ROAST_CONFIG: RoastConfig = {
   roastSpeed: 50,
   packSpeed: 60,
   processing: 0,
+  sellPrice: { 산: 17300, 바다: 16280, 노을: 18800, 디카페인: 31500 },
 };
 
 const norm = (s: string) => (s ?? "").replace(/\s/g, "").toLowerCase();
@@ -98,5 +100,9 @@ export function mergeConfig(saved: unknown): RoastConfig {
     roastSpeed: typeof s.roastSpeed === "number" ? s.roastSpeed : d.roastSpeed,
     packSpeed: typeof s.packSpeed === "number" ? s.packSpeed : d.packSpeed,
     processing: typeof s.processing === "number" ? s.processing : d.processing,
+    sellPrice:
+      s.sellPrice && typeof s.sellPrice === "object"
+        ? { ...d.sellPrice, ...s.sellPrice }
+        : d.sellPrice,
   };
 }
