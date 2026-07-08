@@ -3,8 +3,7 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { roastDateKey } from "@/lib/roasting";
 import { mergeConfig } from "@/lib/roastConfig";
-import { parseMeta } from "@/lib/acctMeta";
-import { vatAmounts, DEFAULT_VAT, type VatMode } from "@/lib/vat";
+import { vatAmounts } from "@/lib/vat";
 import ProfitView, {
   type MonthAgg,
   type PuEntry,
@@ -37,7 +36,7 @@ export default async function ProfitPage() {
     admin
       .from("roast_manual")
       .select("id, account, qtys, roast_date, amount, brand"),
-    admin.from("b2b_accounts").select("id, company_name, memo"),
+    admin.from("b2b_accounts").select("id, company_name"),
   ]);
 
   const config = mergeConfig(cfgRow?.data);
@@ -50,13 +49,6 @@ export default async function ProfitPage() {
   );
   const acctName = new Map(
     (acctRows ?? []).map((a) => [a.id as string, a.company_name as string])
-  );
-  // 계좌별 부가세 모드 (매출을 부가세 포함으로 환산)
-  const acctVat = new Map<string, VatMode>(
-    (acctRows ?? []).map((a) => [
-      a.id as string,
-      parseMeta(a.memo as string | null).vat ?? DEFAULT_VAT,
-    ])
   );
   const orderIds = [...orderDate.keys()];
 
@@ -92,8 +84,7 @@ export default async function ProfitPage() {
       const ym = roastDateKey(created).slice(0, 7);
       const m = ensureHY(ym);
       const acctId = orderAccount.get(oid) ?? "";
-      const mode = acctVat.get(acctId) ?? DEFAULT_VAT;
-      const rev = vatAmounts((it.line_amount as number) ?? 0, mode).total;
+      const rev = (it.line_amount as number) ?? 0;
       const pn = it.product_name as string;
       const qty = (it.qty as number) ?? 0;
       m.orderRevenue += rev;
@@ -113,11 +104,11 @@ export default async function ProfitPage() {
     if (!ym) continue;
     const qtys = (r.qtys as Record<string, number>) ?? {};
     const amount = (r.amount as number) ?? 0;
-    // 수기·납품 단가는 부가세 별도(net) → 매출은 부가세 포함으로
-    const gross = vatAmounts(amount, "excluded").total;
     const isPu = ((r.brand as string) ?? "희연재") === "푸르파파";
+    // 푸르파파 납품 단가는 부가세 별도 → 매출 부가세 포함. 희연재는 원래대로(입력값 그대로).
+    const rev = isPu ? vatAmounts(amount, "excluded").total : amount;
     const m = isPu ? ensurePU(ym) : ensureHY(ym);
-    m.manualRevenue += gross;
+    m.manualRevenue += rev;
     for (const [pn, kg] of Object.entries(qtys)) {
       m.kg[pn] = (m.kg[pn] ?? 0) + (kg ?? 0);
     }
@@ -132,7 +123,7 @@ export default async function ProfitPage() {
     } else {
       const acc = (r.account as string)?.trim() || "(수기)";
       const hr = hyRow(ym, acc);
-      hr.revenue += gross;
+      hr.revenue += amount;
       for (const [pn, kg] of Object.entries(qtys)) {
         hr.kg[pn] = (hr.kg[pn] ?? 0) + (kg ?? 0);
       }
