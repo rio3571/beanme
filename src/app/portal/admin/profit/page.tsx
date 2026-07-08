@@ -3,7 +3,11 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { roastDateKey } from "@/lib/roasting";
 import { mergeConfig } from "@/lib/roastConfig";
-import ProfitView, { type MonthAgg, type PuEntry } from "./ProfitView";
+import ProfitView, {
+  type MonthAgg,
+  type PuEntry,
+  type HyDetailRow,
+} from "./ProfitView";
 
 export const dynamic = "force-dynamic";
 
@@ -15,24 +19,35 @@ export default async function ProfitPage() {
   const admin = createAdminClient();
   const fromIso = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: cfgRow }, { data: orderRows }, { data: manualRows }] =
-    await Promise.all([
-      admin.from("roast_config").select("data").eq("id", 1).maybeSingle(),
-      admin
-        .from("b2b_orders")
-        .select("id, created_at")
-        .neq("status", "canceled")
-        .gte("created_at", fromIso)
-        .limit(2000),
-      admin
-        .from("roast_manual")
-        .select("id, account, qtys, roast_date, amount, brand"),
-    ]);
+  const [
+    { data: cfgRow },
+    { data: orderRows },
+    { data: manualRows },
+    { data: acctRows },
+  ] = await Promise.all([
+    admin.from("roast_config").select("data").eq("id", 1).maybeSingle(),
+    admin
+      .from("b2b_orders")
+      .select("id, created_at, account_id")
+      .neq("status", "canceled")
+      .gte("created_at", fromIso)
+      .limit(2000),
+    admin
+      .from("roast_manual")
+      .select("id, account, qtys, roast_date, amount, brand"),
+    admin.from("b2b_accounts").select("id, company_name"),
+  ]);
 
   const config = mergeConfig(cfgRow?.data);
 
   const orderDate = new Map(
     (orderRows ?? []).map((o) => [o.id as string, o.created_at as string])
+  );
+  const orderAccount = new Map(
+    (orderRows ?? []).map((o) => [o.id as string, o.account_id as string])
+  );
+  const acctName = new Map(
+    (acctRows ?? []).map((a) => [a.id as string, a.company_name as string])
   );
   const orderIds = [...orderDate.keys()];
 
@@ -43,6 +58,18 @@ export default async function ProfitPage() {
   const ensurePU = (ym: string) =>
     (monthPU[ym] ??= { orderRevenue: 0, manualRevenue: 0, kg: {} });
 
+  // 희연재 거래처별 주문내역 (월→거래처)
+  const hyDetailMap: Record<string, Map<string, HyDetailRow>> = {};
+  const hyRow = (ym: string, account: string) => {
+    const mm = (hyDetailMap[ym] ??= new Map());
+    let r = mm.get(account);
+    if (!r) {
+      r = { account, kg: {}, revenue: 0 };
+      mm.set(account, r);
+    }
+    return r;
+  };
+
   // 희연재 = 포털 주문
   if (orderIds.length > 0) {
     const { data: items } = await admin
@@ -50,13 +77,20 @@ export default async function ProfitPage() {
       .select("order_id, product_name, qty, line_amount")
       .in("order_id", orderIds);
     for (const it of items ?? []) {
-      const created = orderDate.get(it.order_id as string);
+      const oid = it.order_id as string;
+      const created = orderDate.get(oid);
       if (!created) continue;
       const ym = roastDateKey(created).slice(0, 7);
       const m = ensureHY(ym);
-      m.orderRevenue += (it.line_amount as number) ?? 0;
+      const rev = (it.line_amount as number) ?? 0;
       const pn = it.product_name as string;
-      m.kg[pn] = (m.kg[pn] ?? 0) + ((it.qty as number) ?? 0);
+      const qty = (it.qty as number) ?? 0;
+      m.orderRevenue += rev;
+      m.kg[pn] = (m.kg[pn] ?? 0) + qty;
+      const name = acctName.get(orderAccount.get(oid) ?? "") ?? "(미지정)";
+      const r = hyRow(ym, name);
+      r.revenue += rev;
+      r.kg[pn] = (r.kg[pn] ?? 0) + qty;
     }
   }
 
@@ -81,7 +115,19 @@ export default async function ProfitPage() {
         roastDate: (r.roast_date as string) ?? "",
         amount,
       });
+    } else {
+      const acc = (r.account as string)?.trim() || "(수기)";
+      const hr = hyRow(ym, acc);
+      hr.revenue += amount;
+      for (const [pn, kg] of Object.entries(qtys)) {
+        hr.kg[pn] = (hr.kg[pn] ?? 0) + (kg ?? 0);
+      }
     }
+  }
+
+  const hyDetail: Record<string, HyDetailRow[]> = {};
+  for (const [ym, mm] of Object.entries(hyDetailMap)) {
+    hyDetail[ym] = [...mm.values()].sort((a, b) => b.revenue - a.revenue);
   }
 
   const kstYm = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7);
@@ -99,6 +145,7 @@ export default async function ProfitPage() {
       monthHY={monthHY}
       monthPU={monthPU}
       puEntries={puEntries}
+      hyDetail={hyDetail}
       months={months}
       defaultMonth={kstYm}
     />

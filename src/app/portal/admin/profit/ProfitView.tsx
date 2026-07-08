@@ -28,6 +28,11 @@ export type PuEntry = {
   roastDate: string;
   amount: number;
 };
+export type HyDetailRow = {
+  account: string;
+  kg: Record<string, number>;
+  revenue: number;
+};
 
 type Brand = "희연재" | "푸르파파";
 
@@ -41,6 +46,7 @@ export default function ProfitView({
   monthHY,
   monthPU,
   puEntries,
+  hyDetail,
   months,
   defaultMonth,
 }: {
@@ -48,6 +54,7 @@ export default function ProfitView({
   monthHY: Record<string, MonthAgg>;
   monthPU: Record<string, MonthAgg>;
   puEntries: PuEntry[];
+  hyDetail: Record<string, HyDetailRow[]>;
   months: string[];
   defaultMonth: string;
 }) {
@@ -151,6 +158,7 @@ export default function ProfitView({
   const packH = cfg.packSpeed > 0 ? totalKg / cfg.packSpeed : 0;
 
   const monthPu = puEntries.filter((e) => e.roastDate.startsWith(month));
+  const hyRows = hyDetail[month] ?? [];
 
   const metric = (
     label: string,
@@ -291,6 +299,102 @@ export default function ProfitView({
           </table>
         </div>
       </div>
+
+      {/* 거래처별 주문내역 (희연재 탭) */}
+      {brand === "희연재" && (
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
+          <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm flex items-center justify-between">
+            <span>📋 거래처별 주문내역 · {fmtMonth(month)}</span>
+            <span className="text-xs font-normal text-stone-400">
+              {hyRows.length}곳
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-stone-50/70 border-b border-stone-200 text-xs text-stone-500">
+                  <th className="px-3 py-2 text-left">거래처</th>
+                  {productNames.map((p) => (
+                    <th
+                      key={p}
+                      className="px-2 py-2 text-right whitespace-nowrap"
+                    >
+                      {p}
+                    </th>
+                  ))}
+                  <th className="px-2 py-2 text-right">합계</th>
+                  <th className="px-2 py-2 text-right">매출</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {hyRows.map((r, i) => {
+                  const rowKg = Object.values(r.kg).reduce((s, v) => s + v, 0);
+                  return (
+                    <tr key={i}>
+                      <td className="px-3 py-2 font-medium text-stone-800 whitespace-nowrap">
+                        {r.account}
+                      </td>
+                      {productNames.map((p) => (
+                        <td
+                          key={p}
+                          className="px-2 py-2 text-right tabular-nums text-stone-600"
+                        >
+                          {r.kg[p] ? r.kg[p] : "·"}
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 text-right tabular-nums font-medium">
+                        {rowKg}kg
+                      </td>
+                      <td className="px-2 py-2 text-right tabular-nums font-semibold text-stone-800">
+                        {won(r.revenue)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {hyRows.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={productNames.length + 3}
+                      className="px-3 py-5 text-center text-stone-400"
+                    >
+                      이 달 주문내역이 없어요.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              {hyRows.length > 0 && (
+                <tfoot>
+                  <tr className="border-t-2 border-stone-200 bg-stone-50 font-bold text-stone-800">
+                    <td className="px-3 py-2">합계</td>
+                    {productNames.map((p) => {
+                      const t = hyRows.reduce((s, r) => s + (r.kg[p] ?? 0), 0);
+                      return (
+                        <td
+                          key={p}
+                          className="px-2 py-2 text-right tabular-nums"
+                        >
+                          {t ? `${t}kg` : "·"}
+                        </td>
+                      );
+                    })}
+                    <td className="px-2 py-2 text-right tabular-nums">
+                      {hyRows.reduce(
+                        (s, r) =>
+                          s + Object.values(r.kg).reduce((a, b) => a + b, 0),
+                        0
+                      )}
+                      kg
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-emerald-700">
+                      {won(hyRows.reduce((s, r) => s + r.revenue, 0))}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* 푸르파파 납품 입력 (푸르파파 탭에서만) */}
       {brand === "푸르파파" && (
