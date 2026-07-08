@@ -225,7 +225,7 @@ export default function ProfitView({
       {/* 수익 요약 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
         {metric(
-          "매출",
+          "매출 (부가세 포함)",
           won(revenue),
           "bg-emerald-50 border-emerald-100",
           brand === "희연재"
