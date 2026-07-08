@@ -14,6 +14,7 @@ import {
   saveRoastConfig,
   addManualRoast,
   removeManualRoast,
+  updateManualAmount,
 } from "../roasting/actions";
 
 export type MonthAgg = {
@@ -46,6 +47,7 @@ export default function ProfitView({
   monthHY,
   monthPU,
   puEntries,
+  hyManual,
   hyDetail,
   months,
   defaultMonth,
@@ -54,6 +56,7 @@ export default function ProfitView({
   monthHY: Record<string, MonthAgg>;
   monthPU: Record<string, MonthAgg>;
   puEntries: PuEntry[];
+  hyManual: PuEntry[];
   hyDetail: Record<string, HyDetailRow[]>;
   months: string[];
   defaultMonth: string;
@@ -71,6 +74,8 @@ export default function ProfitView({
   const [puAccount, setPuAccount] = useState("");
   const [puVals, setPuVals] = useState<Record<string, string>>({});
   const [puAmount, setPuAmount] = useState("");
+  // 희연재 수기 총금액 편집
+  const [hyAmt, setHyAmt] = useState<Record<string, string>>({});
 
   const update = (fn: (c: RoastConfig) => void) =>
     setCfg((prev) => {
@@ -159,6 +164,7 @@ export default function ProfitView({
 
   const monthPu = puEntries.filter((e) => e.roastDate.startsWith(month));
   const hyRows = hyDetail[month] ?? [];
+  const monthHyManual = hyManual.filter((e) => e.roastDate.startsWith(month));
 
   const metric = (
     label: string,
@@ -392,6 +398,66 @@ export default function ProfitView({
                 </tfoot>
               )}
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* 희연재 수기 주문 총금액 입력 (희연재 탭) */}
+      {brand === "희연재" && monthHyManual.length > 0 && (
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
+          <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm">
+            ✍️ 수기 주문 · 총금액 입력 · {fmtMonth(month)}
+          </div>
+          <div className="p-3 space-y-2">
+            {monthHyManual.map((e) => {
+              const kgs = Object.entries(e.qtys)
+                .map(([p, q]) => `${p} ${q}`)
+                .join(" · ");
+              return (
+                <div
+                  key={e.id}
+                  className="flex items-center gap-2 bg-stone-50 rounded-lg border border-stone-200 px-3 py-2"
+                >
+                  <span className="text-sm font-medium text-stone-800 min-w-[80px] truncate">
+                    {e.account || "(수기)"}
+                  </span>
+                  <span className="flex-1 text-xs text-stone-500 truncate">
+                    {kgs || "—"}
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    defaultValue={e.amount || ""}
+                    placeholder="총금액"
+                    onChange={(ev) =>
+                      setHyAmt((v) => ({ ...v, [e.id]: ev.target.value }))
+                    }
+                    className="w-28 h-8 text-right rounded-md border border-stone-300 px-2 text-sm outline-none focus:border-amber-600"
+                  />
+                  <span className="text-xs text-stone-400">원</span>
+                  <button
+                    onClick={() =>
+                      updateManualAmount(
+                        e.id,
+                        Math.round(Number(hyAmt[e.id] ?? e.amount) || 0)
+                      ).then(refresh)
+                    }
+                    className="text-xs font-semibold text-amber-700 border border-amber-200 rounded-md px-2 py-1 hover:bg-amber-50"
+                  >
+                    저장
+                  </button>
+                  <button
+                    onClick={() => removeManualRoast(e.id).then(refresh)}
+                    className="text-stone-400 hover:text-rose-600 text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+            <div className="text-[11px] text-stone-400">
+              로스팅에서 수기로 넣은 주문이에요. 여기서 총금액(매출)을 입력하면 매출·수익에 바로 반영돼요.
+            </div>
           </div>
         </div>
       )}

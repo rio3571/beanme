@@ -33,6 +33,21 @@ export async function addManualRoast(input: {
   return { ok: true };
 }
 
+export async function updateManualAmount(
+  id: string,
+  amount: number
+): Promise<{ ok: boolean }> {
+  if (!(await isAdmin())) return { ok: false };
+  const admin = createAdminClient();
+  await admin
+    .from("roast_manual")
+    .update({ amount: Math.max(0, Math.round(Number(amount) || 0)) })
+    .eq("id", id);
+  revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/profit");
+  return { ok: true };
+}
+
 export async function removeManualRoast(id: string): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   const admin = createAdminClient();

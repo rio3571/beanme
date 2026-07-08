@@ -94,8 +94,9 @@ export default async function ProfitPage() {
     }
   }
 
-  // 수기: 브랜드별 분리 (푸르파파는 원시 목록도 수집)
+  // 수기: 브랜드별 분리 (원시 목록 수집)
   const puEntries: PuEntry[] = [];
+  const hyManual: PuEntry[] = [];
   for (const r of manualRows ?? []) {
     const ym = ((r.roast_date as string) ?? "").slice(0, 7);
     if (!ym) continue;
@@ -122,6 +123,13 @@ export default async function ProfitPage() {
       for (const [pn, kg] of Object.entries(qtys)) {
         hr.kg[pn] = (hr.kg[pn] ?? 0) + (kg ?? 0);
       }
+      hyManual.push({
+        id: r.id as string,
+        account: (r.account as string) ?? "",
+        qtys,
+        roastDate: (r.roast_date as string) ?? "",
+        amount,
+      });
     }
   }
 
@@ -145,6 +153,7 @@ export default async function ProfitPage() {
       monthHY={monthHY}
       monthPU={monthPU}
       puEntries={puEntries}
+      hyManual={hyManual}
       hyDetail={hyDetail}
       months={months}
       defaultMonth={kstYm}
