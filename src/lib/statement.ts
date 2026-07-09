@@ -27,10 +27,14 @@ export async function loadStatement(
 
   const { data: orderData } = await admin
     .from("b2b_orders")
-    .select("id, created_at")
+    .select("id, created_at, unit")
     .eq("account_id", accountId)
     .order("created_at", { ascending: true });
-  const orders = (orderData ?? []) as { id: string; created_at: string }[];
+  const orders = (orderData ?? []) as {
+    id: string;
+    created_at: string;
+    unit: string | null;
+  }[];
 
   const months = Array.from(new Set(orders.map((o) => ym(o.created_at))))
     .filter(Boolean)
@@ -48,19 +52,25 @@ export async function loadStatement(
   let rows: StmtRow[] = [];
   if (monthOrderIds.length > 0) {
     const orderDate = new Map(orders.map((o) => [o.id, o.created_at]));
+    const orderFloor = new Map(orders.map((o) => [o.id, o.unit ?? ""]));
     const { data: itemData } = await admin
       .from("b2b_order_items")
       .select("order_id, product_name, unit, unit_price, qty, line_amount")
       .in("order_id", monthOrderIds);
     rows = (itemData ?? []).map((it) => ({
       date: orderDate.get(it.order_id as string) ?? "",
+      floor: orderFloor.get(it.order_id as string) ?? "",
       name: it.product_name as string,
       unit: (it.unit as string) ?? "",
       qty: it.qty as number,
       unitPrice: it.unit_price as number,
       amount: it.line_amount as number,
     }));
-    rows.sort((a, b) => a.date.localeCompare(b.date));
+    rows.sort(
+      (a, b) =>
+        (a.floor || "").localeCompare(b.floor || "") ||
+        a.date.localeCompare(b.date)
+    );
   }
 
   const total = rows.reduce((s, r) => s + r.amount, 0);

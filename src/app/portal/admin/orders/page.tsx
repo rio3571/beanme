@@ -21,6 +21,7 @@ type OrderRow = {
   total_amount: number;
   note: string | null;
   created_at: string;
+  unit: string | null;
 };
 type ItemRow = {
   order_id: string;
@@ -40,7 +41,7 @@ export default async function AdminOrdersPage() {
   const [{ data: orderData }, { data: acctData }] = await Promise.all([
     admin
       .from("b2b_orders")
-      .select("id, order_no, account_id, status, total_amount, note, created_at")
+      .select("id, order_no, account_id, status, total_amount, note, created_at, unit")
       .order("created_at", { ascending: false })
       .limit(200),
     admin.from("b2b_accounts").select("id, company_name, memo"),
@@ -120,6 +121,11 @@ export default async function AdminOrdersPage() {
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-stone-800 truncate">
               {nameMap.get(o.account_id) ?? "—"}
+              {o.unit && (
+                <span className="ml-1 text-xs font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5">
+                  {o.unit}
+                </span>
+              )}
             </div>
             <div className="text-xs text-stone-500 truncate">
               {summary || "—"}

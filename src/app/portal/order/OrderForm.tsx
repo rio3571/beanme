@@ -19,15 +19,20 @@ export default function OrderForm({
   initialQty,
   initialNote,
   vatMode = DEFAULT_VAT,
+  units = [],
+  initialUnit,
 }: {
   items: OrderItem[];
   orderId?: string;
   initialQty?: Record<string, number>;
   initialNote?: string;
   vatMode?: VatMode;
+  units?: string[];
+  initialUnit?: string;
 }) {
   const [qty, setQty] = useState<Record<string, number>>(initialQty ?? {});
   const [note, setNote] = useState(initialNote ?? "");
+  const [unit, setUnit] = useState(initialUnit ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -50,10 +55,14 @@ export default function OrderForm({
       setErr("수량을 1개 이상 입력하세요.");
       return;
     }
+    if (units.length > 0 && !unit) {
+      setErr("층/부서를 선택하세요.");
+      return;
+    }
     setSubmitting(true);
     const res = orderId
-      ? await editOrder(orderId, { items: chosen, note })
-      : await createOrder({ items: chosen, note });
+      ? await editOrder(orderId, { items: chosen, note, unit })
+      : await createOrder({ items: chosen, note, unit });
     setSubmitting(false);
     if (res.ok) {
       setDone(res.orderNo ?? "");
@@ -100,6 +109,30 @@ export default function OrderForm({
           {VAT_LABEL[vatMode]}
         </span>
       </p>
+
+      {units.length > 0 && (
+        <div className="mb-5 bg-amber-50 border border-amber-100 rounded-xl p-3">
+          <div className="text-sm font-semibold text-stone-700 mb-2">
+            🏢 주문하는 층/부서를 선택하세요
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {units.map((u) => (
+              <button
+                key={u}
+                type="button"
+                onClick={() => setUnit(u)}
+                className={`px-4 h-9 rounded-lg border text-sm font-medium ${
+                  unit === u
+                    ? "bg-amber-700 text-white border-amber-700"
+                    : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
+                }`}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {groups.map((g) => {
         const list = items.filter((it) => it.category === g.key);

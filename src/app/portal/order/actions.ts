@@ -20,6 +20,7 @@ type ProductRow = {
 export async function createOrder(input: {
   items: { id: string; qty: number }[];
   note: string;
+  unit?: string;
 }): Promise<OrderResult> {
   const account = await getMyAccount();
   if (!account || account.role === "admin") {
@@ -29,6 +30,13 @@ export async function createOrder(input: {
   const wanted = (input.items ?? []).filter((i) => i && i.qty > 0);
   if (wanted.length === 0) {
     return { ok: false, error: "수량을 1개 이상 입력하세요." };
+  }
+
+  // 층/부서가 설정된 거래처면 선택 필수
+  const acctUnits = parseMeta(account.memo).units ?? [];
+  const unit = (input.unit ?? "").trim();
+  if (acctUnits.length > 0 && !unit) {
+    return { ok: false, error: "층/부서를 선택하세요." };
   }
 
   const admin = createAdminClient();
@@ -87,6 +95,7 @@ export async function createOrder(input: {
       status: "requested",
       total_amount: total,
       note: input.note?.trim() || null,
+      unit: unit || null,
     })
     .select("id")
     .single();
@@ -106,7 +115,7 @@ export async function createOrder(input: {
     .map((l) => `· ${l.product_name} ${l.qty}${l.unit} = ${won(l.line_amount)}`)
     .join("\n");
   await notifyOwner(
-    `[새 주문] ${account.company_name}\n주문번호 ${order_no}\n${lineText}\n합계 ${won(
+    `[새 주문] ${account.company_name}${unit ? ` · ${unit}` : ""}\n주문번호 ${order_no}\n${lineText}\n합계 ${won(
       total
     )}${input.note?.trim() ? `\n요청: ${input.note.trim()}` : ""}`
   );
@@ -171,7 +180,7 @@ export async function reportOrderCarry(
 
 export async function editOrder(
   orderId: string,
-  input: { items: { id: string; qty: number }[]; note: string }
+  input: { items: { id: string; qty: number }[]; note: string; unit?: string }
 ): Promise<OrderResult> {
   const me = await getMyAccount();
   if (!me) return { ok: false, error: "권한이 없습니다." };
@@ -247,6 +256,7 @@ export async function editOrder(
       total_amount: total,
       note: input.note?.trim() || null,
       status: newStatus,
+      ...(input.unit !== undefined ? { unit: input.unit.trim() || null } : {}),
     })
     .eq("id", orderId);
 

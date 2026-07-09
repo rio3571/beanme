@@ -29,7 +29,7 @@ export default async function EditOrderPage({
   const admin = createAdminClient();
   const { data: order } = await admin
     .from("b2b_orders")
-    .select("id, account_id, status, note, order_no")
+    .select("id, account_id, status, note, order_no, unit")
     .eq("id", id)
     .maybeSingle();
   if (!order || order.account_id !== account.id) redirect("/portal/orders");
@@ -88,6 +88,8 @@ export default async function EditOrderPage({
         initialQty={initialQty}
         initialNote={order.note ?? ""}
         vatMode={parseMeta(account.memo).vat ?? DEFAULT_VAT}
+        units={parseMeta(account.memo).units ?? []}
+        initialUnit={(order.unit as string) ?? ""}
       />
     </div>
   );

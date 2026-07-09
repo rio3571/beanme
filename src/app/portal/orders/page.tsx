@@ -19,6 +19,7 @@ type OrderRow = {
   total_amount: number;
   note: string | null;
   created_at: string;
+  unit: string | null;
 };
 type ItemRow = {
   order_id: string;
@@ -37,7 +38,7 @@ export default async function OrdersPage() {
   const admin = createAdminClient();
   const { data: orderData } = await admin
     .from("b2b_orders")
-    .select("id, order_no, status, total_amount, note, created_at")
+    .select("id, order_no, status, total_amount, note, created_at, unit")
     .eq("account_id", account.id)
     .order("created_at", { ascending: false });
   const orders = (orderData ?? []) as OrderRow[];
@@ -97,7 +98,14 @@ export default async function OrdersPage() {
     return (
     <div key={o.id} className="bg-white rounded-xl border border-stone-200 p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-stone-700">{o.order_no}</span>
+        <span className="text-sm font-semibold text-stone-700">
+          {o.order_no}
+          {o.unit && (
+            <span className="ml-1.5 text-xs font-bold text-amber-700 bg-amber-100 rounded px-1.5 py-0.5">
+              {o.unit}
+            </span>
+          )}
+        </span>
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700">
             {STATUS_LABEL[o.status] ?? o.status}

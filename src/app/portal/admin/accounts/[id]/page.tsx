@@ -10,6 +10,7 @@ import CarryForm from "./CarryForm";
 import NameForm from "./NameForm";
 import TaxInfoForm from "./TaxInfoForm";
 import CustomProductForm from "./CustomProductForm";
+import UnitsForm from "./UnitsForm";
 import PasswordResetForm from "./PasswordResetForm";
 import { DEFAULT_VAT } from "@/lib/vat";
 
@@ -151,6 +152,7 @@ export default async function AccountPricePage({
       >
         📄 거래내역서 (월별) · PDF 다운로드
       </a>
+      <UnitsForm accountId={account.id} units={meta.units ?? []} />
       <CustomProductForm accountId={account.id} items={customProducts} />
       <PriceForm accountId={account.id} rows={rows} />
     </div>

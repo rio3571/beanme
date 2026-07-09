@@ -16,6 +16,7 @@ export type AcctMeta = {
   vat?: VatMode;
   carry?: CarryItem[];
   tax?: TaxInfo;
+  units?: string[]; // 층/부서 (공용 아이디에서 주문 시 선택). 예: ["23층","24층"]
 };
 
 function parseTax(v: unknown): TaxInfo | undefined {
@@ -41,6 +42,10 @@ export function parseMeta(memo: string | null | undefined): AcctMeta {
         vat: isVatMode(o.vat) ? o.vat : undefined,
         carry: isCarryList(o.carry) ? o.carry : undefined,
         tax: parseTax(o.tax),
+        units:
+          Array.isArray(o.units) && o.units.length
+            ? o.units.filter((x: unknown) => typeof x === "string")
+            : undefined,
       };
     } catch {
       return { bank: s };
@@ -57,5 +62,9 @@ export function stringifyMeta(m: AcctMeta): string | null {
   if (isCarryList(m.carry) && m.carry.length) o.carry = m.carry.filter((c) => c.qty !== 0);
   const t = parseTax(m.tax);
   if (t) o.tax = t;
+  if (Array.isArray(m.units)) {
+    const u = m.units.map((s) => s.trim()).filter(Boolean);
+    if (u.length) o.units = u;
+  }
   return Object.keys(o).length ? JSON.stringify(o) : null;
 }

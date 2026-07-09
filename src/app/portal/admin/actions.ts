@@ -8,6 +8,35 @@ import { revalidatePath } from "next/cache";
 
 export type CreateAccountState = { error: string | null; ok?: boolean };
 
+// ── 거래처 층/부서 목록 (공용 아이디에서 주문 시 선택) ──
+export async function setAccountUnits(
+  accountId: string,
+  unitsText: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const units = String(unitsText)
+    .split(/[,\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("b2b_accounts")
+    .select("memo")
+    .eq("id", accountId)
+    .maybeSingle();
+  const meta = parseMeta((data?.memo as string) ?? null);
+  meta.units = units;
+  const memo = stringifyMeta(meta);
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ memo })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
 // ── 거래처 전용 판매품목 (전용 블렌드 등) ──
 export async function addCustomProduct(
   accountId: string,

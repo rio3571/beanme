@@ -70,7 +70,11 @@ export default async function OrderPage() {
           <span className="text-stone-700 whitespace-pre-wrap">{meta.bank}</span>
         </div>
       )}
-      <OrderForm items={items} vatMode={meta.vat ?? DEFAULT_VAT} />
+      <OrderForm
+        items={items}
+        vatMode={meta.vat ?? DEFAULT_VAT}
+        units={meta.units ?? []}
+      />
     </>
   );
 }

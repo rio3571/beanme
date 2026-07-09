@@ -7,6 +7,7 @@ import { vatAmounts, VAT_LABEL, DEFAULT_VAT, type VatMode } from "@/lib/vat";
 
 export type StmtRow = {
   date: string;
+  floor?: string; // 층/부서 (공용 주문 거래처)
   name: string;
   unit: string;
   qty: number;
@@ -184,6 +185,9 @@ export default function StatementView({
                     {kstDate(r.date)}
                   </td>
                   <td className="border border-stone-300 px-2 py-1.5">
+                    {r.floor && (
+                      <span className="text-stone-500">[{r.floor}] </span>
+                    )}
                     {r.name}
                   </td>
                   <td className="border border-stone-300 px-2 py-1.5 text-right">
