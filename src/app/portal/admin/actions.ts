@@ -37,6 +37,32 @@ export async function setAccountUnits(
   return { ok: true };
 }
 
+// ── 거래처 정산 시작일 (전월 N일 ~ 당월 N-1일 주기) ──
+export async function setAccountBillDay(
+  accountId: string,
+  day: number
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("b2b_accounts")
+    .select("memo")
+    .eq("id", accountId)
+    .maybeSingle();
+  const meta = parseMeta((data?.memo as string) ?? null);
+  const d = Math.round(Number(day) || 0);
+  meta.billDay = d >= 2 && d <= 28 ? d : undefined;
+  const memo = stringifyMeta(meta);
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ memo })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  return { ok: true };
+}
+
 // ── 거래처 전용 판매품목 (전용 블렌드 등) ──
 export async function addCustomProduct(
   accountId: string,

@@ -17,10 +17,8 @@ export default async function StatementPage({
   if (account.role === "admin") redirect("/portal/admin");
 
   const sp = await searchParams;
-  const { buyer, months, selectedYm, rows, total, vatMode } = await loadStatement(
-    account.id,
-    sp.ym
-  );
+  const { buyer, months, selectedYm, rows, total, vatMode, periodLabel } =
+    await loadStatement(account.id, sp.ym);
 
   return (
     <div>
@@ -53,6 +51,7 @@ export default async function StatementPage({
         rows={rows}
         total={total}
         vatMode={vatMode}
+        periodLabel={periodLabel}
       />
     </div>
   );

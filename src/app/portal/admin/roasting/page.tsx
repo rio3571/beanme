@@ -18,6 +18,7 @@ type OrderRow = {
   account_id: string;
   status: string;
   created_at: string;
+  unit: string | null;
 };
 type ItemRow = {
   order_id: string;
@@ -49,7 +50,7 @@ export default async function RoastingPage() {
   ] = await Promise.all([
     admin
       .from("b2b_orders")
-      .select("id, account_id, status, created_at")
+      .select("id, account_id, status, created_at, unit")
       .not("status", "in", "(canceled,done)")
       .order("created_at", { ascending: false })
       .limit(300),
@@ -143,16 +144,19 @@ export default async function RoastingPage() {
       b = { key, accounts: new Map(), order: [] };
       batchMap.set(key, b);
     }
-    let a = b.accounts.get(o.account_id);
+    // 층/부서가 있으면 거래처+층으로 분리 (신한자산운용 23층 등)
+    const gid = o.unit ? `${o.account_id}${o.unit}` : o.account_id;
+    let a = b.accounts.get(gid);
     if (!a) {
+      const base = nameMap.get(o.account_id) ?? "—";
       a = {
-        name: nameMap.get(o.account_id) ?? "—",
+        name: o.unit ? `${base} ${o.unit}` : base,
         orderIds: [],
         qty: new Map(),
         status: "done",
       };
-      b.accounts.set(o.account_id, a);
-      b.order.push(o.account_id);
+      b.accounts.set(gid, a);
+      b.order.push(gid);
     }
     a.orderIds.push(o.id);
     // 가장 진행 안 된 상태로 유지

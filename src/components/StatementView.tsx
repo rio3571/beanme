@@ -30,12 +30,14 @@ export default function StatementView({
   rows,
   total,
   vatMode = DEFAULT_VAT,
+  periodLabel,
 }: {
   buyer: StmtBuyer;
   monthYm: string;
   rows: StmtRow[];
   total: number;
   vatMode?: VatMode;
+  periodLabel?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
@@ -122,7 +124,7 @@ export default function StatementView({
             거 래 명 세 서
           </div>
           <div className="text-center text-sm text-stone-500 mb-4">
-            {ymLabel(monthYm)} 거래내역 · {VAT_LABEL[vatMode]}
+            {periodLabel ?? ymLabel(monthYm)} 거래내역 · {VAT_LABEL[vatMode]}
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-5 text-sm">

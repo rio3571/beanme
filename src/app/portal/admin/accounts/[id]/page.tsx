@@ -152,7 +152,11 @@ export default async function AccountPricePage({
       >
         📄 거래내역서 (월별) · PDF 다운로드
       </a>
-      <UnitsForm accountId={account.id} units={meta.units ?? []} />
+      <UnitsForm
+        accountId={account.id}
+        units={meta.units ?? []}
+        billDay={meta.billDay}
+      />
       <CustomProductForm accountId={account.id} items={customProducts} />
       <PriceForm accountId={account.id} rows={rows} />
     </div>
