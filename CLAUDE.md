@@ -212,6 +212,21 @@ data/
 
 **콜드스타트 제거**: Vercel **Pro** 확인. `src/app/api/keepalive/route.ts`(GET, 가벼운 DB핑) + `vercel.json` crons `*/5 * * * *`. 측정: 콜드 1.9s→warm 0.2s, 크론으로 상시 warm. (Supabase Pro=DB, Vercel Pro+Fluid+keepalive=콜드스타트, 서로 다른 레이어)
 
+### 2026-07-09 층별 공용주문 + 정산주기 + 매출 부가세(푸르파파)
+
+**거래처 층/부서 공용주문** (신한자산운용: 23~26층이 한 아이디로 각자 주문, 결제 한 번):
+- `acctMeta.units`(층 배열) + 거래처상세 `UnitsForm`(setAccountUnits). `b2b_orders.unit` 컬럼(ALTER).
+- 주문폼 층 선택(units 있으면 필수), createOrder/editOrder unit 저장·검증. order/page·edit에서 units 전달.
+- 표시: 주문내역(거래처/관리자) 층 뱃지, 텔레그램 알림 `· 23층`.
+- **로스팅 목록**: 거래처+층 복합키(gid=account_id+unit)로 줄 분리. `신한자산운용 23층`.
+
+**정산 주기(billDay) + 날짜지정 거래내역서**:
+- `acctMeta.billDay`(2~28, 정산 시작일) — 예 26 → 전월26~당월25. UnitsForm에 정산일 입력(setAccountBillDay).
+- `lib/statement.ts` 재작성: `periodKey`(billDay 주기), `periodRange`, from/to 날짜지정 override, `periodLabel` 반환.
+- 관리자 명세서: 기간 표시 + 날짜지정 조회 폼(GET ?from&to), 월별 버튼. StatementView `periodLabel`·`floor`([23층] prefix)·층별 정렬.
+
+**푸르파파 매출 부가세 포함**(희연재는 원래대로): profit page 푸르파파 manualRevenue ×1.1(vatAmounts excluded.total), 입력 미리보기·매출카드 공급가/부가세/포함 분해. 희연재 매출은 입력값 그대로(계좌 대부분 포함/현금이라 변화 거의 없음).
+
 ### 미완료 / 다음
 - ⏳ 세금계산서 **운영전환**(위 ⚠️ 참고) — 인증서 발급이 관건.
 - ✅ 수익관리 실주문 연동 완료(위 2026-07-08). 원두주문=희연재 매출.
