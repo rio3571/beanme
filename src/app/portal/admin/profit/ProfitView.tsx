@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { won } from "@/lib/format";
+import { SUPPLIER } from "@/lib/supplier";
 import {
   productCostMap,
   packagingPerKg,
@@ -272,6 +273,87 @@ export default function ProfitView({
           return [...merged.values()].sort((a, b) => b.revenue - a.revenue);
         })();
 
+  function printSettlement() {
+    const now = new Date();
+    const issued = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}.${String(now.getDate()).padStart(2, "0")}`;
+    const row = (l: string, hy: number, pu: number) =>
+      `<tr><td>${l}</td><td class="r">${won(hy)}</td><td class="r">${won(
+        pu
+      )}</td><td class="r b">${won(hy + pu)}</td></tr>`;
+    const neg = (l: string, hy: number, pu: number) =>
+      `<tr><td>${l}</td><td class="r n">-${won(hy)}</td><td class="r n">-${won(
+        pu
+      )}</td><td class="r n">-${won(hy + pu)}</td></tr>`;
+    const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>로스팅 정산서 · ${periodLabel}</title><style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#1c1917;padding:26px 30px;font-size:13px;}
+h1{font-size:22px;font-weight:800;letter-spacing:-0.5px;}
+.sub{color:#78716c;font-size:12px;margin-top:4px;}
+.supplier{margin:16px 0;border:1px solid #e7e5e4;border-radius:8px;padding:11px 14px;font-size:12px;line-height:1.7;background:#fafaf9;}
+.supplier b{color:#292524;}
+h2{font-size:14px;font-weight:700;margin:20px 0 4px;}
+table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12.5px;}
+th{background:#292524;color:#fff;padding:8px 10px;text-align:left;font-weight:600;}
+th.r,td.r{text-align:right;}
+td{padding:8px 10px;border-bottom:1px solid #e7e5e4;}
+td.b{font-weight:700;}
+tr.total td{background:#f5f5f4;font-weight:800;border-top:2px solid #292524;}
+tr.em td{background:#ecfdf5;font-weight:700;}
+.n{color:#b91c1c;}
+.foot{margin-top:18px;font-size:11px;color:#78716c;line-height:1.6;border-top:1px solid #e7e5e4;padding-top:10px;}
+.issued{text-align:right;margin-top:12px;font-size:12px;color:#57534e;}
+@media print{body{padding:0;}@page{size:A4;margin:16mm;}}
+</style></head><body>
+<h1>로스팅 정산서</h1>
+<div class="sub">${periodLabel} · 희연재 + 푸르파파 합산</div>
+<div class="supplier"><b>${SUPPLIER.name}</b> (${SUPPLIER.ceo}) · 사업자 ${
+      SUPPLIER.bizNo
+    }<br>${SUPPLIER.address}<br>${SUPPLIER.bizType} / ${SUPPLIER.bizItem}${
+      SUPPLIER.email ? ` · ${SUPPLIER.email}` : ""
+    }</div>
+<h2>매출</h2>
+<table><thead><tr><th>항목</th><th class="r">희연재</th><th class="r">푸르파파</th><th class="r">합계</th></tr></thead><tbody>
+${row("과세 매출(공급가)", hyVatableNet, puVatableNet)}
+${row("부가세(10%)", hyVat, puVat)}
+${row("현금 매출(부가세 없음)", hyCashNet, puCashNet)}
+<tr class="em"><td>매출 합계</td><td class="r">${won(hyGross)}</td><td class="r">${won(
+      puGross
+    )}</td><td class="r">${won(hyGross + puGross)}</td></tr>
+</tbody></table>
+<h2>원가 · 이익</h2>
+<table><thead><tr><th>항목</th><th class="r">희연재</th><th class="r">푸르파파</th><th class="r">합계</th></tr></thead><tbody>
+${neg("원두원가", resHY.beanCost, resPU.beanCost)}
+${neg("포장재", resHY.pkgCost, resPU.pkgCost)}
+${neg("가공비", resHY.procCost, resPU.procCost)}
+${neg("고정비", resHY.fix, resPU.fix)}
+<tr class="total"><td>실질이익</td><td class="r">${won(resHY.profit)}</td><td class="r">${won(
+      resPU.profit
+    )}</td><td class="r">${won(resHY.profit + resPU.profit)}</td></tr>
+</tbody></table>
+<h2>예상 세금 · 세후 이익 (참고)</h2>
+<table><tbody>
+<tr><td>과세소득 (실질이익)</td><td class="r">${won(taxBase)}</td></tr>
+<tr><td>법인세 (2억↓ 9% · 초과 19%)</td><td class="r n">-${won(corpTax)}</td></tr>
+<tr><td>지방소득세 (법인세의 10%)</td><td class="r n">-${won(localTax)}</td></tr>
+<tr class="total"><td>세후 이익</td><td class="r">${won(afterTax)}</td></tr>
+</tbody></table>
+<div class="foot">※ 부가세는 과세 거래처에만 10% 적용(현금 제외). 세금은 참고용 추정치이며, 실제 세액은 인건비·감가상각·세액공제·중간예납 등으로 달라집니다. 법인세는 사업연도 기준 연 1회 신고 — 정확한 신고는 세무사 확인 권장.</div>
+<div class="issued">발행일 ${issued}</div>
+</body></html>`;
+    const w = window.open("", "_blank", "width=820,height=1040");
+    if (!w) {
+      alert("팝업이 차단됐어요. 팝업 허용 후 다시 시도해주세요.");
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+  }
+
   const metric = (
     label: string,
     value: string,
@@ -438,8 +520,14 @@ export default function ProfitView({
       {/* 합산 정산 표 (합산 탭) — 부가세 한눈에 */}
       {brand === "합산" && (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
-          <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm">
-            🧾 브랜드별 정산 · {periodLabel}
+          <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm flex items-center justify-between gap-2">
+            <span>🧾 브랜드별 정산 · {periodLabel}</span>
+            <button
+              onClick={printSettlement}
+              className="text-xs font-semibold text-amber-700 border border-amber-200 rounded-md px-2.5 py-1 hover:bg-amber-50 whitespace-nowrap"
+            >
+              🖨 정산서 출력
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
