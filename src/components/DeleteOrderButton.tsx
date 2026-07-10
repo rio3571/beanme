@@ -17,10 +17,14 @@ export default function DeleteOrderButton({
   return (
     <button
       onClick={() => {
-        if (!confirm("이 주문을 삭제할까요? 되돌릴 수 없어요.")) return;
+        const msg =
+          label === "취소"
+            ? "이 주문을 취소할까요? 되돌릴 수 없어요."
+            : "이 주문을 삭제할까요? 되돌릴 수 없어요.";
+        if (!confirm(msg)) return;
         start(async () => {
           const res = await deleteOrder(orderId);
-          if (!res.ok) alert(res.error ?? "삭제 실패");
+          if (!res.ok) alert(res.error ?? `${label} 실패`);
           router.refresh();
         });
       }}
