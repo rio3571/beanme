@@ -66,6 +66,7 @@ export default function ProfitView({
   const [cfg, setCfg] = useState<RoastConfig>(config);
   const [brand, setBrand] = useState<Brand>("희연재");
   const [month, setMonth] = useState(defaultMonth);
+  const [period, setPeriod] = useState<"월" | "분기">("월");
   const [showCfg, setShowCfg] = useState(false);
   const [saving, startSave] = useTransition();
   const [, startAct] = useTransition();
@@ -98,9 +99,10 @@ export default function ProfitView({
     });
   }
 
-  function shiftMonth(delta: number) {
+  function shiftPeriod(delta: number) {
     const [y, m] = month.split("-").map(Number);
-    const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+    const step = period === "분기" ? delta * 3 : delta;
+    const d = new Date(Date.UTC(y, m - 1 + step, 1));
     setMonth(
       `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`
     );
@@ -141,14 +143,34 @@ export default function ProfitView({
   // ── 수익 계산 (편집 중 cfg 기준 실시간) ──
   const cost = productCostMap(cfg);
   const pkgPerKg = packagingPerKg(cfg);
-  const EMPTY: MonthAgg = {
-    orderRevenue: 0,
-    manualRevenue: 0,
-    cashRevenue: 0,
-    kg: {},
+  // 기간(월/분기) 집계 대상 월 키
+  const [pY, pM] = month.split("-").map(Number);
+  const qIdx = Math.floor((pM - 1) / 3); // 0=1분기 .. 3=4분기
+  const periodKeys =
+    period === "월"
+      ? [month]
+      : [1, 2, 3].map((i) => `${pY}-${String(qIdx * 3 + i).padStart(2, "0")}`);
+  const periodLabel =
+    period === "월" ? fmtMonth(month) : `${pY}년 ${qIdx + 1}분기`;
+  const aggMonths = (src: Record<string, MonthAgg>): MonthAgg => {
+    const out: MonthAgg = {
+      orderRevenue: 0,
+      manualRevenue: 0,
+      cashRevenue: 0,
+      kg: {},
+    };
+    for (const k of periodKeys) {
+      const m = src[k];
+      if (!m) continue;
+      out.orderRevenue += m.orderRevenue;
+      out.manualRevenue += m.manualRevenue;
+      out.cashRevenue += m.cashRevenue;
+      for (const [p, v] of Object.entries(m.kg)) out.kg[p] = (out.kg[p] ?? 0) + v;
+    }
+    return out;
   };
-  const mdHY = monthHY[month] ?? EMPTY;
-  const mdPU = monthPU[month] ?? EMPTY;
+  const mdHY = aggMonths(monthHY);
+  const mdPU = aggMonths(monthPU);
 
   const calc = (m: MonthAgg, shareRatio: number) => {
     const revenue = m.orderRevenue + m.manualRevenue;
@@ -228,9 +250,27 @@ export default function ProfitView({
   const localTax = Math.round(corpTax * 0.1);
   const afterTax = sumProfit - corpTax - localTax;
 
-  const monthPu = puEntries.filter((e) => e.roastDate.startsWith(month));
-  const hyRows = hyDetail[month] ?? [];
-  const monthHyManual = hyManual.filter((e) => e.roastDate.startsWith(month));
+  const inPeriod = (rd: string) => periodKeys.some((k) => rd.startsWith(k));
+  const monthPu = puEntries.filter((e) => inPeriod(e.roastDate));
+  const monthHyManual = hyManual.filter((e) => inPeriod(e.roastDate));
+  const hyRows =
+    period === "월"
+      ? hyDetail[month] ?? []
+      : (() => {
+          const merged = new Map<string, HyDetailRow>();
+          for (const k of periodKeys)
+            for (const r of hyDetail[k] ?? []) {
+              let m = merged.get(r.account);
+              if (!m) {
+                m = { account: r.account, kg: {}, revenue: 0 };
+                merged.set(r.account, m);
+              }
+              m.revenue += r.revenue;
+              for (const [p, v] of Object.entries(r.kg))
+                m.kg[p] = (m.kg[p] ?? 0) + v;
+            }
+          return [...merged.values()].sort((a, b) => b.revenue - a.revenue);
+        })();
 
   const metric = (
     label: string,
@@ -270,17 +310,32 @@ export default function ProfitView({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-stone-300 overflow-hidden text-xs">
+            {(["월", "분기"] as const).map((pv) => (
+              <button
+                key={pv}
+                onClick={() => setPeriod(pv)}
+                className={`px-2.5 py-1 font-medium ${
+                  period === pv
+                    ? "bg-stone-700 text-white"
+                    : "bg-white text-stone-600 hover:bg-stone-50"
+                }`}
+              >
+                {pv}
+              </button>
+            ))}
+          </div>
           <button
-            onClick={() => shiftMonth(-1)}
+            onClick={() => shiftPeriod(-1)}
             className="h-8 w-8 rounded-md border border-stone-300 text-stone-500 hover:bg-stone-100"
           >
             ‹
           </button>
           <span className="font-bold text-stone-800 tabular-nums min-w-[92px] text-center">
-            {fmtMonth(month)}
+            {periodLabel}
           </span>
           <button
-            onClick={() => shiftMonth(1)}
+            onClick={() => shiftPeriod(1)}
             className="h-8 w-8 rounded-md border border-stone-300 text-stone-500 hover:bg-stone-100"
           >
             ›
@@ -335,7 +390,7 @@ export default function ProfitView({
       {/* 품목별 */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
         <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm">
-          품목별 · {brand} · {fmtMonth(month)}
+          품목별 · {brand} · {periodLabel}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
@@ -384,7 +439,7 @@ export default function ProfitView({
       {brand === "합산" && (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
           <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm">
-            🧾 브랜드별 정산 · {fmtMonth(month)}
+            🧾 브랜드별 정산 · {periodLabel}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
@@ -496,7 +551,7 @@ export default function ProfitView({
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
           <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm flex items-center gap-2">
             <span>📊 예상 세금 · 세후 이익</span>
-            <span className="text-[11px] font-normal text-stone-400">참고용 · {fmtMonth(month)}</span>
+            <span className="text-[11px] font-normal text-stone-400">참고용 · {periodLabel}</span>
           </div>
           <div className="p-3 space-y-1.5 text-sm">
             <div className="flex justify-between">
@@ -540,7 +595,7 @@ export default function ProfitView({
       {brand === "희연재" && (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
           <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm flex items-center justify-between">
-            <span>📋 거래처별 주문내역 · {fmtMonth(month)}</span>
+            <span>📋 거래처별 주문내역 · {periodLabel}</span>
             <span className="text-xs font-normal text-stone-400">
               {hyRows.length}곳
             </span>
@@ -636,7 +691,7 @@ export default function ProfitView({
       {brand === "희연재" && monthHyManual.length > 0 && (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
           <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm">
-            ✍️ 수기 주문 · 총금액 입력 · {fmtMonth(month)}
+            ✍️ 수기 주문 · 총금액 입력 · {periodLabel}
           </div>
           <div className="p-3 space-y-2">
             {monthHyManual.map((e) => {
@@ -696,7 +751,7 @@ export default function ProfitView({
       {brand === "푸르파파" && (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
           <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm">
-            ✍️ 푸르파파 납품 입력 · {fmtMonth(month)}
+            ✍️ 푸르파파 납품 입력 · {periodLabel}
           </div>
           <div className="p-3">
             <div className="flex flex-wrap items-end gap-2 mb-3">
