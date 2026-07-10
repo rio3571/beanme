@@ -35,7 +35,7 @@ export type HyDetailRow = {
   revenue: number;
 };
 
-type Brand = "희연재" | "푸르파파";
+type Brand = "희연재" | "푸르파파" | "합산";
 
 function fmtMonth(ym: string): string {
   const [y, m] = ym.split("-");
@@ -140,27 +140,69 @@ export default function ProfitView({
   // ── 수익 계산 (편집 중 cfg 기준 실시간) ──
   const cost = productCostMap(cfg);
   const pkgPerKg = packagingPerKg(cfg);
-  const share = brand === "희연재" ? cfg.fixed.hyShare : 1 - cfg.fixed.hyShare;
-  const fix = Math.round(fixedTotal(cfg) * share);
-  const md =
-    (brand === "희연재" ? monthHY[month] : monthPU[month]) ?? {
-      orderRevenue: 0,
-      manualRevenue: 0,
-      kg: {},
+  const EMPTY: MonthAgg = { orderRevenue: 0, manualRevenue: 0, kg: {} };
+  const mdHY = monthHY[month] ?? EMPTY;
+  const mdPU = monthPU[month] ?? EMPTY;
+
+  const calc = (m: MonthAgg, shareRatio: number) => {
+    const revenue = m.orderRevenue + m.manualRevenue;
+    const totalKg = Object.values(m.kg).reduce((s, v) => s + v, 0);
+    const beanCost = Object.keys(m.kg).reduce(
+      (s, p) => s + (m.kg[p] ?? 0) * (cost[p] ?? 0),
+      0
+    );
+    const pkgCost = Math.round(totalKg * pkgPerKg);
+    const procCost = Math.round(totalKg * cfg.processing);
+    const fix = Math.round(fixedTotal(cfg) * shareRatio);
+    const profit = revenue - beanCost - pkgCost - fix - procCost;
+    return {
+      revenue,
+      totalKg,
+      beanCost,
+      pkgCost,
+      procCost,
+      fix,
+      profit,
+      margin: revenue > 0 ? (profit / revenue) * 100 : 0,
     };
+  };
+
+  const resHY = calc(mdHY, cfg.fixed.hyShare);
+  const resPU = calc(mdPU, 1 - cfg.fixed.hyShare);
+
+  // 합산용 병합 (희연재 + 푸르파파)
+  const mergedKg: Record<string, number> = {};
+  for (const src of [mdHY.kg, mdPU.kg])
+    for (const [p, v] of Object.entries(src))
+      mergedKg[p] = (mergedKg[p] ?? 0) + v;
+  const mdSum: MonthAgg = {
+    orderRevenue: mdHY.orderRevenue + mdPU.orderRevenue,
+    manualRevenue: mdHY.manualRevenue + mdPU.manualRevenue,
+    kg: mergedKg,
+  };
+
+  const share =
+    brand === "희연재"
+      ? cfg.fixed.hyShare
+      : brand === "푸르파파"
+      ? 1 - cfg.fixed.hyShare
+      : 1;
+  const md = brand === "희연재" ? mdHY : brand === "푸르파파" ? mdPU : mdSum;
+  const res =
+    brand === "희연재" ? resHY : brand === "푸르파파" ? resPU : calc(mdSum, 1);
+  const { revenue, totalKg, beanCost, pkgCost, procCost, fix, profit, margin } =
+    res;
   const products = [...new Set([...productNames, ...Object.keys(md.kg)])];
-  const revenue = md.orderRevenue + md.manualRevenue;
-  const totalKg = Object.values(md.kg).reduce((s, v) => s + v, 0);
-  const beanCost = products.reduce(
-    (s, p) => s + (md.kg[p] ?? 0) * (cost[p] ?? 0),
-    0
-  );
-  const pkgCost = Math.round(totalKg * pkgPerKg);
-  const procCost = Math.round(totalKg * cfg.processing);
-  const profit = revenue - beanCost - pkgCost - fix - procCost;
-  const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
   const roastH = cfg.roastSpeed > 0 ? totalKg / cfg.roastSpeed : 0;
   const packH = cfg.packSpeed > 0 ? totalKg / cfg.packSpeed : 0;
+
+  // 부가세 분해 (합산 정산 표시용) — 희연재=공급가 기준(부가세 추정), 푸르파파=부가세 포함 매출
+  const hyNet = resHY.revenue;
+  const hyVat = Math.round(hyNet * 0.1);
+  const hyGross = hyNet + hyVat;
+  const puGross = resPU.revenue;
+  const puNet = Math.round(puGross / 1.1);
+  const puVat = puGross - puNet;
 
   const monthPu = puEntries.filter((e) => e.roastDate.startsWith(month));
   const hyRows = hyDetail[month] ?? [];
@@ -188,7 +230,7 @@ export default function ProfitView({
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold text-stone-800">로스팅 수익</h1>
           <div className="flex rounded-lg border border-stone-300 overflow-hidden text-sm">
-            {(["희연재", "푸르파파"] as Brand[]).map((b) => (
+            {(["희연재", "푸르파파", "합산"] as Brand[]).map((b) => (
               <button
                 key={b}
                 onClick={() => setBrand(b)}
@@ -225,14 +267,20 @@ export default function ProfitView({
       {/* 수익 요약 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
         {metric(
-          brand === "푸르파파" ? "매출 (부가세 포함)" : "매출",
+          brand === "푸르파파"
+            ? "매출 (부가세 포함)"
+            : brand === "합산"
+            ? "매출 (합산)"
+            : "매출",
           won(revenue),
           "bg-emerald-50 border-emerald-100",
           brand === "희연재"
             ? `주문 ${won(md.orderRevenue)} + 수기 ${won(md.manualRevenue)}`
-            : `공급가 ${won(Math.round(revenue / 1.1))} + 부가세 ${won(
+            : brand === "푸르파파"
+            ? `공급가 ${won(Math.round(revenue / 1.1))} + 부가세 ${won(
                 revenue - Math.round(revenue / 1.1)
               )}`
+            : `희연재 ${won(resHY.revenue)} + 푸르파파 ${won(resPU.revenue)}`
         )}
         {metric(
           "실질이익",
@@ -307,6 +355,98 @@ export default function ProfitView({
           </table>
         </div>
       </div>
+
+      {/* 합산 정산 표 (합산 탭) — 부가세 한눈에 */}
+      {brand === "합산" && (
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
+          <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm">
+            🧾 브랜드별 정산 · {fmtMonth(month)}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-stone-50/70 border-b border-stone-200 text-xs text-stone-500">
+                  <th className="px-3 py-2 text-left">항목</th>
+                  <th className="px-2 py-2 text-right">희연재</th>
+                  <th className="px-2 py-2 text-right">푸르파파</th>
+                  <th className="px-2 py-2 text-right">합계</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                <tr>
+                  <td className="px-3 py-2 text-stone-600">매출 (공급가)</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{won(hyNet)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{won(puNet)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-medium">
+                    {won(hyNet + puNet)}
+                  </td>
+                </tr>
+                <tr className="text-stone-500">
+                  <td className="px-3 py-2">부가세 (10%)</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{won(hyVat)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{won(puVat)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-medium">
+                    {won(hyVat + puVat)}
+                  </td>
+                </tr>
+                <tr className="bg-emerald-50/50">
+                  <td className="px-3 py-2 font-semibold text-stone-700">
+                    매출 (부가세 포함)
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums font-semibold">
+                    {won(hyGross)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums font-semibold">
+                    {won(puGross)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums font-bold text-emerald-700">
+                    {won(hyGross + puGross)}
+                  </td>
+                </tr>
+                {(
+                  [
+                    ["원두원가", resHY.beanCost, resPU.beanCost],
+                    ["포장재", resHY.pkgCost, resPU.pkgCost],
+                    ["가공비", resHY.procCost, resPU.procCost],
+                    ["고정비", resHY.fix, resPU.fix],
+                  ] as [string, number, number][]
+                ).map(([label, hy, pu]) => (
+                  <tr key={label}>
+                    <td className="px-3 py-2 text-stone-600">{label}</td>
+                    <td className="px-2 py-2 text-right tabular-nums text-rose-600">
+                      -{won(hy)}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-rose-600">
+                      -{won(pu)}
+                    </td>
+                    <td className="px-2 py-2 text-right tabular-nums text-rose-600">
+                      -{won(hy + pu)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-stone-200 bg-stone-50 font-bold text-stone-800">
+                  <td className="px-3 py-2">실질이익</td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {won(resHY.profit)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {won(resPU.profit)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums text-emerald-700">
+                    {won(resHY.profit + resPU.profit)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="px-4 py-2 text-[11px] text-stone-400 leading-relaxed">
+            ※ 부가세는 참고용 — 희연재는 공급가 기준 10% 추정(현금 거래처 포함),
+            푸르파파는 납품 매출(부가세 포함) 기준. 실질이익은 기존 수익 계산과 동일해요.
+          </div>
+        </div>
+      )}
 
       {/* 거래처별 주문내역 (희연재 탭) */}
       {brand === "희연재" && (
