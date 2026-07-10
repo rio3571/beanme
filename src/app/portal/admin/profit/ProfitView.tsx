@@ -218,6 +218,16 @@ export default function ProfitView({
   const puVat = puVatableGross - puVatableNet;
   const puNet = puVatableNet + puCashNet;
 
+  // 예상 세금 (합산 실질이익 기준 · 참고용) — 법인세 9%/19% 누진 + 지방소득세 10%
+  const sumProfit = resHY.profit + resPU.profit;
+  const taxBase = Math.max(0, sumProfit);
+  const corpTax = Math.round(
+    Math.min(taxBase, 200_000_000) * 0.09 +
+      Math.max(0, taxBase - 200_000_000) * 0.19
+  );
+  const localTax = Math.round(corpTax * 0.1);
+  const afterTax = sumProfit - corpTax - localTax;
+
   const monthPu = puEntries.filter((e) => e.roastDate.startsWith(month));
   const hyRows = hyDetail[month] ?? [];
   const monthHyManual = hyManual.filter((e) => e.roastDate.startsWith(month));
@@ -477,6 +487,51 @@ export default function ProfitView({
           <div className="px-4 py-2 text-[11px] text-stone-400 leading-relaxed">
             ※ 부가세는 <b>과세 거래처에만 10%</b> 적용 (현금 거래처는 제외).
             푸르파파는 납품 매출(부가세 별도→포함) 기준. 실질이익은 기존 수익 계산과 동일해요.
+          </div>
+        </div>
+      )}
+
+      {/* 예상 세금 · 세후 이익 (합산 탭 · 참고용) */}
+      {brand === "합산" && (
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
+          <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm flex items-center gap-2">
+            <span>📊 예상 세금 · 세후 이익</span>
+            <span className="text-[11px] font-normal text-stone-400">참고용 · {fmtMonth(month)}</span>
+          </div>
+          <div className="p-3 space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-stone-500">과세소득 (실질이익)</span>
+              <span className="font-medium tabular-nums">{won(taxBase)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-stone-500">
+                법인세{" "}
+                <span className="text-[11px] text-stone-400">(2억↓ 9% · 초과 19%)</span>
+              </span>
+              <span className="tabular-nums text-rose-600">-{won(corpTax)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-stone-500">
+                지방소득세{" "}
+                <span className="text-[11px] text-stone-400">(법인세의 10%)</span>
+              </span>
+              <span className="tabular-nums text-rose-600">-{won(localTax)}</span>
+            </div>
+            <div className="flex justify-between border-t border-stone-200 pt-2 mt-1">
+              <span className="font-semibold text-stone-700">세후 이익</span>
+              <span
+                className={`font-bold tabular-nums ${
+                  afterTax >= 0 ? "text-emerald-700" : "text-rose-600"
+                }`}
+              >
+                {won(afterTax)}
+              </span>
+            </div>
+          </div>
+          <div className="px-4 pb-3 text-[11px] text-stone-400 leading-relaxed">
+            ※ <b>참고용 추정치</b>예요. 이 달 실질이익만으로 계산한 대략값이라,
+            실제 세액은 다른 손금·인건비·감가상각·세액공제·중간예납 등으로 달라져요.
+            법인세는 <b>사업연도 기준 연 1회 신고</b>(분기 부가세 신고와 별개) — 정확한 신고는 세무사 확인 권장.
           </div>
         </div>
       )}
