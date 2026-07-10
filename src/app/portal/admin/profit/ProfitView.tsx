@@ -20,6 +20,7 @@ import {
 export type MonthAgg = {
   orderRevenue: number;
   manualRevenue: number;
+  cashRevenue: number; // 주문 중 현금(부가세 없음) 거래처 매출
   kg: Record<string, number>;
 };
 export type PuEntry = {
@@ -140,7 +141,12 @@ export default function ProfitView({
   // ── 수익 계산 (편집 중 cfg 기준 실시간) ──
   const cost = productCostMap(cfg);
   const pkgPerKg = packagingPerKg(cfg);
-  const EMPTY: MonthAgg = { orderRevenue: 0, manualRevenue: 0, kg: {} };
+  const EMPTY: MonthAgg = {
+    orderRevenue: 0,
+    manualRevenue: 0,
+    cashRevenue: 0,
+    kg: {},
+  };
   const mdHY = monthHY[month] ?? EMPTY;
   const mdPU = monthPU[month] ?? EMPTY;
 
@@ -178,6 +184,7 @@ export default function ProfitView({
   const mdSum: MonthAgg = {
     orderRevenue: mdHY.orderRevenue + mdPU.orderRevenue,
     manualRevenue: mdHY.manualRevenue + mdPU.manualRevenue,
+    cashRevenue: mdHY.cashRevenue + mdPU.cashRevenue,
     kg: mergedKg,
   };
 
@@ -196,13 +203,20 @@ export default function ProfitView({
   const roastH = cfg.roastSpeed > 0 ? totalKg / cfg.roastSpeed : 0;
   const packH = cfg.packSpeed > 0 ? totalKg / cfg.packSpeed : 0;
 
-  // 부가세 분해 (합산 정산 표시용) — 희연재=공급가 기준(부가세 추정), 푸르파파=부가세 포함 매출
-  const hyNet = resHY.revenue;
-  const hyVat = Math.round(hyNet * 0.1);
-  const hyGross = hyNet + hyVat;
+  // 부가세 분해 (합산 정산 표시용)
+  // 희연재: 전체 공급가에서 현금(부가세X) 매출을 빼고, 과세분에만 10% 적용
+  const hyTotalNet = mdHY.orderRevenue + mdHY.manualRevenue;
+  const hyCashNet = mdHY.cashRevenue;
+  const hyVatableNet = Math.max(0, hyTotalNet - hyCashNet);
+  const hyVat = Math.round(hyVatableNet * 0.1);
+  const hyGross = hyVatableNet + hyVat + hyCashNet;
+  // 푸르파파: 납품 매출(부가세 포함) 기준
   const puGross = resPU.revenue;
-  const puNet = Math.round(puGross / 1.1);
-  const puVat = puGross - puNet;
+  const puCashNet = mdPU.cashRevenue;
+  const puVatableGross = Math.max(0, puGross - puCashNet);
+  const puVatableNet = Math.round(puVatableGross / 1.1);
+  const puVat = puVatableGross - puVatableNet;
+  const puNet = puVatableNet + puCashNet;
 
   const monthPu = puEntries.filter((e) => e.roastDate.startsWith(month));
   const hyRows = hyDetail[month] ?? [];
@@ -374,11 +388,15 @@ export default function ProfitView({
               </thead>
               <tbody className="divide-y divide-stone-100">
                 <tr>
-                  <td className="px-3 py-2 text-stone-600">매출 (공급가)</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{won(hyNet)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{won(puNet)}</td>
+                  <td className="px-3 py-2 text-stone-600">과세 매출 (공급가)</td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {won(hyVatableNet)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {won(puVatableNet)}
+                  </td>
                   <td className="px-2 py-2 text-right tabular-nums font-medium">
-                    {won(hyNet + puNet)}
+                    {won(hyVatableNet + puVatableNet)}
                   </td>
                 </tr>
                 <tr className="text-stone-500">
@@ -389,9 +407,24 @@ export default function ProfitView({
                     {won(hyVat + puVat)}
                   </td>
                 </tr>
+                <tr>
+                  <td className="px-3 py-2 text-stone-600">
+                    현금 매출{" "}
+                    <span className="text-[11px] text-stone-400">(부가세 없음)</span>
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {hyCashNet ? won(hyCashNet) : "·"}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {puCashNet ? won(puCashNet) : "·"}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums font-medium">
+                    {hyCashNet + puCashNet ? won(hyCashNet + puCashNet) : "·"}
+                  </td>
+                </tr>
                 <tr className="bg-emerald-50/50">
                   <td className="px-3 py-2 font-semibold text-stone-700">
-                    매출 (부가세 포함)
+                    매출 합계
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums font-semibold">
                     {won(hyGross)}
@@ -442,8 +475,8 @@ export default function ProfitView({
             </table>
           </div>
           <div className="px-4 py-2 text-[11px] text-stone-400 leading-relaxed">
-            ※ 부가세는 참고용 — 희연재는 공급가 기준 10% 추정(현금 거래처 포함),
-            푸르파파는 납품 매출(부가세 포함) 기준. 실질이익은 기존 수익 계산과 동일해요.
+            ※ 부가세는 <b>과세 거래처에만 10%</b> 적용 (현금 거래처는 제외).
+            푸르파파는 납품 매출(부가세 별도→포함) 기준. 실질이익은 기존 수익 계산과 동일해요.
           </div>
         </div>
       )}

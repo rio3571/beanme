@@ -3,7 +3,8 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { roastDateKey } from "@/lib/roasting";
 import { mergeConfig } from "@/lib/roastConfig";
-import { vatAmounts } from "@/lib/vat";
+import { vatAmounts, DEFAULT_VAT } from "@/lib/vat";
+import { parseMeta } from "@/lib/acctMeta";
 import ProfitView, {
   type MonthAgg,
   type PuEntry,
@@ -36,7 +37,7 @@ export default async function ProfitPage() {
     admin
       .from("roast_manual")
       .select("id, account, qtys, roast_date, amount, brand"),
-    admin.from("b2b_accounts").select("id, company_name"),
+    admin.from("b2b_accounts").select("id, company_name, memo"),
   ]);
 
   const config = mergeConfig(cfgRow?.data);
@@ -50,14 +51,21 @@ export default async function ProfitPage() {
   const acctName = new Map(
     (acctRows ?? []).map((a) => [a.id as string, a.company_name as string])
   );
+  // 거래처별 부가세 모드 (현금 = 부가세 없음)
+  const vatMode = new Map(
+    (acctRows ?? []).map((a) => [
+      a.id as string,
+      parseMeta(a.memo as string | null).vat ?? DEFAULT_VAT,
+    ])
+  );
   const orderIds = [...orderDate.keys()];
 
   const monthHY: Record<string, MonthAgg> = {};
   const monthPU: Record<string, MonthAgg> = {};
   const ensureHY = (ym: string) =>
-    (monthHY[ym] ??= { orderRevenue: 0, manualRevenue: 0, kg: {} });
+    (monthHY[ym] ??= { orderRevenue: 0, manualRevenue: 0, cashRevenue: 0, kg: {} });
   const ensurePU = (ym: string) =>
-    (monthPU[ym] ??= { orderRevenue: 0, manualRevenue: 0, kg: {} });
+    (monthPU[ym] ??= { orderRevenue: 0, manualRevenue: 0, cashRevenue: 0, kg: {} });
 
   // 희연재 거래처별 주문내역 (월→거래처)
   const hyDetailMap: Record<string, Map<string, HyDetailRow>> = {};
@@ -88,6 +96,7 @@ export default async function ProfitPage() {
       const pn = it.product_name as string;
       const qty = (it.qty as number) ?? 0;
       m.orderRevenue += rev;
+      if ((vatMode.get(acctId) ?? DEFAULT_VAT) === "cash") m.cashRevenue += rev;
       m.kg[pn] = (m.kg[pn] ?? 0) + qty;
       const name = acctName.get(acctId) ?? "(미지정)";
       const r = hyRow(ym, name);
