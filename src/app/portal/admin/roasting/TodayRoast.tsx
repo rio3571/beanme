@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import RoastingRow from "./RoastingRow";
 import {
   addManualRoast,
+  updateManualRoast,
   removeManualRoast,
   setManualDone,
   clearManualMonth,
@@ -122,6 +123,41 @@ export default function TodayRoast({
     setManualDone(id, !cur?.done).then(refresh);
   }
 
+  // ── 수기 행 인라인 수정 ──
+  const [editId, setEditId] = useState<string | null>(null);
+  const [eAccount, setEAccount] = useState("");
+  const [eVals, setEVals] = useState<Record<string, string>>({});
+  const [eAmount, setEAmount] = useState("");
+
+  function startEdit(e: Entry) {
+    setEditId(e.id);
+    setEAccount(e.account || "");
+    const v: Record<string, string> = {};
+    for (const c of columns) v[c] = e.qtys[c] ? String(e.qtys[c]) : "";
+    setEVals(v);
+    setEAmount(e.amount ? String(e.amount) : "");
+  }
+  function cancelEdit() {
+    setEditId(null);
+    setEAccount("");
+    setEVals({});
+    setEAmount("");
+  }
+  function saveEdit(id: string) {
+    const qtys: Record<string, number> = {};
+    for (const p of columns) {
+      const q = Math.round(Number(eVals[p]) || 0);
+      if (q > 0) qtys[p] = q;
+    }
+    const acc = eAccount.trim();
+    const amt = Math.max(0, Math.round(Number(eAmount) || 0));
+    const accountId = accounts.find((a) => a.name === acc)?.id ?? null;
+    cancelEdit();
+    updateManualRoast(id, { account: acc, qtys, amount: amt, accountId }).then(
+      refresh
+    );
+  }
+
   // 현재 배치에 속한 수기 (배치일 일치 또는 날짜없는 레거시)
   const batchEntries = entries.filter(
     (e) => e.roastDate === batchKey || !e.roastDate
@@ -223,72 +259,132 @@ export default function TodayRoast({
                 />
               ))}
               {/* 수기 행 */}
-              {batchEntries.map((e) => (
-                <tr
-                  key={e.id}
-                  className={e.done ? "bg-emerald-50/40" : "bg-amber-50/40"}
-                >
-                  <td className="px-3 py-2 text-sm font-semibold text-stone-800 whitespace-nowrap">
-                    <span className="mr-1 text-[10px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5 align-middle">
-                      수기
-                    </span>
-                    {e.accountId && (
-                      <span
-                        title="기존 거래처 연결됨"
-                        className="mr-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 rounded px-1 py-0.5 align-middle"
-                      >
-                        🔗
-                      </span>
-                    )}
-                    <span className={e.done ? "line-through text-stone-400" : ""}>
-                      {e.account || "—"}
-                    </span>
-                    {e.amount > 0 && (
-                      <span className="ml-1.5 text-xs font-normal text-stone-400">
-                        {e.amount.toLocaleString()}원
-                      </span>
-                    )}
-                  </td>
-                  {columns.map((c, i) => (
-                    <td
-                      key={i}
-                      className="px-2 py-2 text-center text-sm tabular-nums whitespace-nowrap"
-                    >
-                      {e.qtys[c] ? (
-                        <span
-                          className={
-                            e.done
-                              ? "text-stone-400"
-                              : "font-bold text-stone-800"
+              {batchEntries.map((e) =>
+                editId === e.id ? (
+                  <tr key={e.id} className="bg-sky-50/60">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <input
+                        value={eAccount}
+                        onChange={(ev) => setEAccount(ev.target.value)}
+                        placeholder="거래처"
+                        list="beanme-accounts"
+                        className="h-8 w-32 rounded-md border border-stone-300 px-2 text-sm outline-none focus:border-amber-600"
+                      />
+                    </td>
+                    {columns.map((c, i) => (
+                      <td key={i} className="px-1 py-2 text-center whitespace-nowrap">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={eVals[c] ?? ""}
+                          onChange={(ev) =>
+                            setEVals((v) => ({ ...v, [c]: ev.target.value }))
                           }
+                          onKeyDown={(ev) => ev.key === "Enter" && saveEdit(e.id)}
+                          placeholder="0"
+                          className="w-12 h-8 text-right rounded-md border border-stone-300 px-1 text-sm outline-none focus:border-amber-600"
+                        />
+                      </td>
+                    ))}
+                    <td className="px-2 py-2 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={eAmount}
+                          onChange={(ev) => setEAmount(ev.target.value)}
+                          onKeyDown={(ev) => ev.key === "Enter" && saveEdit(e.id)}
+                          placeholder="금액"
+                          className="w-20 h-8 text-right rounded-md border border-stone-300 px-1.5 text-sm outline-none focus:border-amber-600"
+                        />
+                        <button
+                          onClick={() => saveEdit(e.id)}
+                          className="text-xs font-semibold rounded-md px-2 py-1.5 bg-amber-700 text-white hover:bg-amber-800"
                         >
-                          {e.qtys[c]}
+                          저장
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="text-xs text-stone-400 hover:text-stone-600"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr
+                    key={e.id}
+                    className={e.done ? "bg-emerald-50/40" : "bg-amber-50/40"}
+                  >
+                    <td className="px-3 py-2 text-sm font-semibold text-stone-800 whitespace-nowrap">
+                      <span className="mr-1 text-[10px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5 align-middle">
+                        수기
+                      </span>
+                      {e.accountId && (
+                        <span
+                          title="기존 거래처 연결됨"
+                          className="mr-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 rounded px-1 py-0.5 align-middle"
+                        >
+                          🔗
                         </span>
-                      ) : (
-                        <span className="text-stone-300">·</span>
+                      )}
+                      <span className={e.done ? "line-through text-stone-400" : ""}>
+                        {e.account || "—"}
+                      </span>
+                      {e.amount > 0 && (
+                        <span className="ml-1.5 text-xs font-normal text-stone-400">
+                          {e.amount.toLocaleString()}원
+                        </span>
                       )}
                     </td>
-                  ))}
-                  <td className="px-2 py-2 text-right whitespace-nowrap">
-                    <button
-                      onClick={() => toggleDone(e.id)}
-                      className={`text-xs font-semibold rounded-md px-2 py-1 mr-1 ${
-                        e.done
-                          ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                          : "bg-amber-700 text-white hover:bg-amber-800"
-                      }`}
-                    >
-                      {e.done ? "완료됨" : "완료"}
-                    </button>
-                    <button
-                      onClick={() => remove(e.id)}
-                      className="text-xs text-stone-400 hover:text-rose-600"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    {columns.map((c, i) => (
+                      <td
+                        key={i}
+                        className="px-2 py-2 text-center text-sm tabular-nums whitespace-nowrap"
+                      >
+                        {e.qtys[c] ? (
+                          <span
+                            className={
+                              e.done
+                                ? "text-stone-400"
+                                : "font-bold text-stone-800"
+                            }
+                          >
+                            {e.qtys[c]}
+                          </span>
+                        ) : (
+                          <span className="text-stone-300">·</span>
+                        )}
+                      </td>
+                    ))}
+                    <td className="px-2 py-2 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => startEdit(e)}
+                        className="text-xs font-semibold rounded-md px-2 py-1 mr-1 bg-stone-100 text-stone-600 hover:bg-stone-200"
+                      >
+                        수정
+                      </button>
+                      <button
+                        onClick={() => toggleDone(e.id)}
+                        className={`text-xs font-semibold rounded-md px-2 py-1 mr-1 ${
+                          e.done
+                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                            : "bg-amber-700 text-white hover:bg-amber-800"
+                        }`}
+                      >
+                        {e.done ? "완료됨" : "완료"}
+                      </button>
+                      <button
+                        onClick={() => remove(e.id)}
+                        className="text-xs text-stone-400 hover:text-rose-600"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )}
               {rows.length === 0 && batchEntries.length === 0 && (
                 <tr>
                   <td
@@ -464,49 +560,117 @@ export default function TodayRoast({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
-                      {monthEntries.map((e) => (
-                        <tr key={e.id} className={e.done ? "bg-emerald-50/30" : ""}>
-                          <td className="px-3 py-2 text-xs text-stone-500 whitespace-nowrap tabular-nums">
-                            {fmtDay(e.roastDate)}
-                          </td>
-                          <td className="px-2 py-2 text-sm text-stone-700 whitespace-nowrap">
-                            {e.account || "—"}
-                          </td>
-                          {columns.map((c, i) => (
-                            <td
-                              key={i}
-                              className="px-2 py-2 text-center text-sm tabular-nums whitespace-nowrap"
-                            >
-                              {e.qtys[c] ? (
-                                <span className="font-semibold text-stone-800">
-                                  {e.qtys[c]}
-                                </span>
-                              ) : (
-                                <span className="text-stone-300">·</span>
-                              )}
+                      {monthEntries.map((e) =>
+                        editId === e.id ? (
+                          <tr key={e.id} className="bg-sky-50/60">
+                            <td className="px-3 py-2 text-xs text-stone-500 whitespace-nowrap tabular-nums">
+                              {fmtDay(e.roastDate)}
                             </td>
-                          ))}
-                          <td className="px-2 py-2 text-right text-sm tabular-nums whitespace-nowrap text-stone-700">
-                            {e.amount ? e.amount.toLocaleString() : "·"}
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={e.done}
-                              onChange={() => toggleDone(e.id)}
-                              className="h-4 w-4 accent-emerald-600 cursor-pointer"
-                            />
-                          </td>
-                          <td className="px-2 py-2 text-right">
-                            <button
-                              onClick={() => remove(e.id)}
-                              className="text-xs text-stone-400 hover:text-rose-600"
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            <td className="px-2 py-2 whitespace-nowrap">
+                              <input
+                                value={eAccount}
+                                onChange={(ev) => setEAccount(ev.target.value)}
+                                placeholder="거래처"
+                                list="beanme-accounts"
+                                className="h-8 w-28 rounded-md border border-stone-300 px-2 text-sm outline-none focus:border-amber-600"
+                              />
+                            </td>
+                            {columns.map((c, i) => (
+                              <td key={i} className="px-1 py-2 text-center whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={eVals[c] ?? ""}
+                                  onChange={(ev) =>
+                                    setEVals((v) => ({ ...v, [c]: ev.target.value }))
+                                  }
+                                  onKeyDown={(ev) => ev.key === "Enter" && saveEdit(e.id)}
+                                  placeholder="0"
+                                  className="w-12 h-8 text-right rounded-md border border-stone-300 px-1 text-sm outline-none focus:border-amber-600"
+                                />
+                              </td>
+                            ))}
+                            <td className="px-2 py-2 text-right whitespace-nowrap">
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                value={eAmount}
+                                onChange={(ev) => setEAmount(ev.target.value)}
+                                onKeyDown={(ev) => ev.key === "Enter" && saveEdit(e.id)}
+                                placeholder="금액"
+                                className="w-20 h-8 text-right rounded-md border border-stone-300 px-1.5 text-sm outline-none focus:border-amber-600"
+                              />
+                            </td>
+                            <td className="px-2 py-2 text-center whitespace-nowrap" colSpan={2}>
+                              <button
+                                onClick={() => saveEdit(e.id)}
+                                className="text-xs font-semibold rounded-md px-2 py-1.5 bg-amber-700 text-white hover:bg-amber-800 mr-1"
+                              >
+                                저장
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                className="text-xs text-stone-400 hover:text-stone-600"
+                              >
+                                취소
+                              </button>
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr key={e.id} className={e.done ? "bg-emerald-50/30" : ""}>
+                            <td className="px-3 py-2 text-xs text-stone-500 whitespace-nowrap tabular-nums">
+                              {fmtDay(e.roastDate)}
+                            </td>
+                            <td className="px-2 py-2 text-sm text-stone-700 whitespace-nowrap">
+                              {e.accountId && (
+                                <span title="기존 거래처 연결됨" className="mr-1 align-middle">
+                                  🔗
+                                </span>
+                              )}
+                              {e.account || "—"}
+                            </td>
+                            {columns.map((c, i) => (
+                              <td
+                                key={i}
+                                className="px-2 py-2 text-center text-sm tabular-nums whitespace-nowrap"
+                              >
+                                {e.qtys[c] ? (
+                                  <span className="font-semibold text-stone-800">
+                                    {e.qtys[c]}
+                                  </span>
+                                ) : (
+                                  <span className="text-stone-300">·</span>
+                                )}
+                              </td>
+                            ))}
+                            <td className="px-2 py-2 text-right text-sm tabular-nums whitespace-nowrap text-stone-700">
+                              {e.amount ? e.amount.toLocaleString() : "·"}
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={e.done}
+                                onChange={() => toggleDone(e.id)}
+                                className="h-4 w-4 accent-emerald-600 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-2 py-2 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => startEdit(e)}
+                                className="text-xs font-semibold text-stone-500 hover:text-amber-700 mr-2"
+                              >
+                                수정
+                              </button>
+                              <button
+                                onClick={() => remove(e.id)}
+                                className="text-xs text-stone-400 hover:text-rose-600"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      )}
                       {monthEntries.length === 0 && (
                         <tr>
                           <td

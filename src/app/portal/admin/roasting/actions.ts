@@ -50,6 +50,32 @@ export async function updateManualAmount(
   return { ok: true };
 }
 
+/** 수기 행 전체 수정 (거래처·품목수량·금액·연결) */
+export async function updateManualRoast(
+  id: string,
+  input: {
+    account: string;
+    qtys: Qtys;
+    amount?: number;
+    accountId?: string | null;
+  }
+): Promise<{ ok: boolean }> {
+  if (!(await isAdmin())) return { ok: false };
+  const admin = createAdminClient();
+  await admin
+    .from("roast_manual")
+    .update({
+      account: (input.account ?? "").trim(),
+      qtys: input.qtys ?? {},
+      amount: Math.max(0, Math.round(Number(input.amount) || 0)),
+      account_id: input.accountId || null,
+    })
+    .eq("id", id);
+  revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/profit");
+  return { ok: true };
+}
+
 export async function removeManualRoast(id: string): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   const admin = createAdminClient();
