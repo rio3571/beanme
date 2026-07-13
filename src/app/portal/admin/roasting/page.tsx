@@ -82,11 +82,17 @@ export default async function RoastingPage() {
       done: m.done === true,
       ts: (m.created_at as string) ?? "",
       amount: (m.amount as number) ?? 0,
+      accountId: (m.account_id as string) ?? "",
     }));
 
   const nameMap = new Map(
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])
   );
+  // 수기 입력창에서 고를 기존 거래처 목록 (가나다순)
+  const accounts = (acctData ?? [])
+    .map((a) => ({ id: a.id as string, name: a.company_name as string }))
+    .filter((a) => a.name)
+    .sort((x, y) => x.name.localeCompare(y.name, "ko"));
   const columns: string[] = (prodData ?? []).map((p) => p.name as string);
 
   const ids = orders.map((o) => o.id);
@@ -218,6 +224,7 @@ export default async function RoastingPage() {
         rows={todayOrderRows}
         manualEntries={manualEntries}
         orderMonthTotals={orderMonthTotals}
+        accounts={accounts}
       />
 
       {otherKeys.length > 0 && (

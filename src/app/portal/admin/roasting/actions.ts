@@ -18,6 +18,7 @@ export async function addManualRoast(input: {
   roastDate: string;
   amount?: number;
   brand?: string; // '희연재'(기본) | '푸르파파'
+  accountId?: string | null; // 기존 거래처(b2b_accounts) 연결 (선택)
 }): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   const admin = createAdminClient();
@@ -27,6 +28,7 @@ export async function addManualRoast(input: {
     roast_date: input.roastDate,
     amount: Math.max(0, Math.round(Number(input.amount) || 0)),
     brand: input.brand === "푸르파파" ? "푸르파파" : "희연재",
+    account_id: input.accountId || null,
   });
   revalidatePath("/portal/admin/roasting");
   revalidatePath("/portal/admin/profit");

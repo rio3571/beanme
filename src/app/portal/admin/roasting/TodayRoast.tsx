@@ -26,7 +26,9 @@ type Entry = {
   done: boolean;
   ts: string; // 생성 ISO
   amount: number; // 매출 금액(원)
+  accountId?: string; // 연결된 기존 거래처(b2b_accounts) id
 };
+type Account = { id: string; name: string };
 
 function fmtDay(key: string): string {
   const [, m, d] = key.split("-");
@@ -43,6 +45,7 @@ export default function TodayRoast({
   rows,
   manualEntries,
   orderMonthTotals,
+  accounts,
 }: {
   columns: string[];
   dateLabel: string;
@@ -52,6 +55,7 @@ export default function TodayRoast({
   rows: OrderRow[];
   manualEntries: Entry[]; // 서버 저장 수기 (어디서든 동일)
   orderMonthTotals: Record<string, Record<string, number>>; // 월별·품목별 포털 주문 합계
+  accounts: Account[]; // 수기 입력에서 고를 기존 거래처 목록
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -82,6 +86,13 @@ export default function TodayRoast({
 
   const refresh = () => startTransition(() => router.refresh());
 
+  // 입력한 거래처명이 기존 거래처와 정확히 일치하면 그 계정 (연결 대상)
+  const linkedAccount = useMemo(() => {
+    const acc = account.trim();
+    if (!acc) return null;
+    return accounts.find((a) => a.name === acc) ?? null;
+  }, [account, accounts]);
+
   function add() {
     const qtys: Record<string, number> = {};
     for (const p of columns) {
@@ -91,12 +102,17 @@ export default function TodayRoast({
     if (Object.keys(qtys).length === 0) return;
     const acc = account.trim();
     const amt = Math.max(0, Math.round(Number(amount) || 0));
+    const accountId = accounts.find((a) => a.name === acc)?.id ?? null;
     setAccount("");
     setVals({});
     setAmount("");
-    addManualRoast({ account: acc, qtys, roastDate: batchKey, amount: amt }).then(
-      refresh
-    );
+    addManualRoast({
+      account: acc,
+      qtys,
+      roastDate: batchKey,
+      amount: amt,
+      accountId,
+    }).then(refresh);
   }
   function remove(id: string) {
     removeManualRoast(id).then(refresh);
@@ -216,6 +232,14 @@ export default function TodayRoast({
                     <span className="mr-1 text-[10px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5 align-middle">
                       수기
                     </span>
+                    {e.accountId && (
+                      <span
+                        title="기존 거래처 연결됨"
+                        className="mr-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 rounded px-1 py-0.5 align-middle"
+                      >
+                        🔗
+                      </span>
+                    )}
                     <span className={e.done ? "line-through text-stone-400" : ""}>
                       {e.account || "—"}
                     </span>
@@ -301,12 +325,29 @@ export default function TodayRoast({
             ✍️ 수기 추가 (전화·카톡 등 다른 경로 주문 · 서버 저장 → 폰·PC 어디서든 동일)
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <input
-              value={account}
-              onChange={(e) => setAccount(e.target.value)}
-              placeholder="거래처 (선택)"
-              className="h-9 w-32 rounded-lg border border-stone-300 px-2.5 text-sm outline-none focus:border-amber-600"
-            />
+            <div className="flex flex-col gap-0.5">
+              <input
+                value={account}
+                onChange={(e) => setAccount(e.target.value)}
+                placeholder="거래처 (선택·기존 검색)"
+                list="beanme-accounts"
+                className={`h-9 w-40 rounded-lg border px-2.5 text-sm outline-none focus:border-amber-600 ${
+                  linkedAccount ? "border-emerald-400 bg-emerald-50/40" : "border-stone-300"
+                }`}
+              />
+              <span className="h-3 text-[10px] leading-3 pl-0.5">
+                {linkedAccount ? (
+                  <span className="text-emerald-600 font-semibold">🔗 기존 거래처 연결됨</span>
+                ) : account.trim() ? (
+                  <span className="text-stone-400">새 거래처(연결 안 됨)</span>
+                ) : null}
+              </span>
+            </div>
+            <datalist id="beanme-accounts">
+              {accounts.map((a) => (
+                <option key={a.id} value={a.name} />
+              ))}
+            </datalist>
             {columns.map((p) => (
               <div key={p} className="flex items-center gap-1">
                 <span className="text-xs text-stone-500">{p}</span>
