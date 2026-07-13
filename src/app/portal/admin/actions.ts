@@ -398,6 +398,41 @@ export async function updateOrderStatus(
   return { ok: true };
 }
 
+/**
+ * 상태 변경 시 거래처에게 포털 메시지 알림.
+ * 확인(confirmed) → "접수되었습니다", 완료(done) → "발송되었습니다".
+ * 이미 그 상태였던 주문은 제외해 중복 클릭 시 재알림하지 않음.
+ */
+const STATUS_NOTIFY: Record<string, string> = {
+  confirmed: "☕ 주문이 접수되었습니다.",
+  done: "🚚 주문이 발송되었습니다.",
+};
+
+async function notifyStatusToBuyers(
+  admin: ReturnType<typeof createAdminClient>,
+  before: { account_id: string | null; status: string }[],
+  status: string
+): Promise<void> {
+  const body = STATUS_NOTIFY[status];
+  if (!body) return;
+  const acctIds = [
+    ...new Set(
+      before
+        .filter((o) => o.status !== status && o.account_id)
+        .map((o) => o.account_id as string)
+    ),
+  ];
+  for (const account_id of acctIds) {
+    await admin.from("b2b_messages").insert({
+      account_id,
+      sender: "admin",
+      body,
+      read_by_admin: true,
+      read_by_buyer: false,
+    });
+  }
+}
+
 /** 여러 주문의 상태를 한 번에 변경 (로스팅 목록의 거래처별 일괄 처리용) */
 export async function updateOrdersStatus(
   orderIds: string[],
@@ -410,11 +445,17 @@ export async function updateOrdersStatus(
   if (!orderIds.length) return { ok: true };
 
   const admin = createAdminClient();
+  // 알림 판단용: 변경 전 상태·거래처 조회
+  const { data: before } = await admin
+    .from("b2b_orders")
+    .select("account_id, status")
+    .in("id", orderIds);
   const { error } = await admin
     .from("b2b_orders")
     .update({ status })
     .in("id", orderIds);
   if (error) return { ok: false, error: error.message };
+  await notifyStatusToBuyers(admin, before ?? [], status);
   revalidatePath("/portal/admin/roasting");
   revalidatePath("/portal/admin/orders");
   return { ok: true };
