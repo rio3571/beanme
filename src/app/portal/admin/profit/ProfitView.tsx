@@ -173,8 +173,13 @@ export default function ProfitView({
   const mdHY = aggMonths(monthHY);
   const mdPU = aggMonths(monthPU);
 
-  const calc = (m: MonthAgg, shareRatio: number) => {
-    const revenue = m.orderRevenue + m.manualRevenue;
+  const calc = (m: MonthAgg, shareRatio: number, isPu: boolean) => {
+    // 희연재 입력가 = 순공급가 취급 / 푸르파파 = 부가세 포함가
+    const grossRevenue = m.orderRevenue + m.manualRevenue;
+    const netRevenue = isPu ? Math.round(grossRevenue / 1.1) : grossRevenue; // 부가세 제외 순매출
+    const cash = m.cashRevenue; // 현금(부가세 없음) = 대표님 개인 수익
+    const bizRevenue = Math.max(0, netRevenue - cash); // 회사 매출(현금 제외 · 과세 순액)
+    const vat = Math.round(bizRevenue * 0.1); // 내야 할 부가세
     const totalKg = Object.values(m.kg).reduce((s, v) => s + v, 0);
     const beanCost = Object.keys(m.kg).reduce(
       (s, p) => s + (m.kg[p] ?? 0) * (cost[p] ?? 0),
@@ -183,23 +188,49 @@ export default function ProfitView({
     const pkgCost = Math.round(totalKg * pkgPerKg);
     const procCost = Math.round(totalKg * cfg.processing);
     const fix = Math.round(fixedTotal(cfg) * shareRatio);
-    const profit = revenue - beanCost - pkgCost - fix - procCost;
+    // 실질이익 = 회사 매출(현금 제외) − 전체 원가(현금 판매분 원가 포함).
+    // 부가세(내야 할 것)·현금(개인 수익)은 수익에서 제외.
+    const profit = bizRevenue - beanCost - pkgCost - fix - procCost;
     return {
-      revenue,
+      grossRevenue,
+      netRevenue,
+      cash,
+      bizRevenue,
+      vat,
       totalKg,
       beanCost,
       pkgCost,
       procCost,
       fix,
       profit,
-      margin: revenue > 0 ? (profit / revenue) * 100 : 0,
+      margin: bizRevenue > 0 ? (profit / bizRevenue) * 100 : 0,
     };
   };
+  type Res = ReturnType<typeof calc>;
 
-  const resHY = calc(mdHY, cfg.fixed.hyShare);
-  const resPU = calc(mdPU, 1 - cfg.fixed.hyShare);
+  const resHY = calc(mdHY, cfg.fixed.hyShare, false);
+  const resPU = calc(mdPU, 1 - cfg.fixed.hyShare, true);
+  const resSum: Res = {
+    grossRevenue: resHY.grossRevenue + resPU.grossRevenue,
+    netRevenue: resHY.netRevenue + resPU.netRevenue,
+    cash: resHY.cash + resPU.cash,
+    bizRevenue: resHY.bizRevenue + resPU.bizRevenue,
+    vat: resHY.vat + resPU.vat,
+    totalKg: resHY.totalKg + resPU.totalKg,
+    beanCost: resHY.beanCost + resPU.beanCost,
+    pkgCost: resHY.pkgCost + resPU.pkgCost,
+    procCost: resHY.procCost + resPU.procCost,
+    fix: resHY.fix + resPU.fix,
+    profit: resHY.profit + resPU.profit,
+    margin:
+      resHY.bizRevenue + resPU.bizRevenue > 0
+        ? ((resHY.profit + resPU.profit) /
+            (resHY.bizRevenue + resPU.bizRevenue)) *
+          100
+        : 0,
+  };
 
-  // 합산용 병합 (희연재 + 푸르파파)
+  // 합산용 kg 병합 (품목 표시용)
   const mergedKg: Record<string, number> = {};
   for (const src of [mdHY.kg, mdPU.kg])
     for (const [p, v] of Object.entries(src))
@@ -218,28 +249,24 @@ export default function ProfitView({
       ? 1 - cfg.fixed.hyShare
       : 1;
   const md = brand === "희연재" ? mdHY : brand === "푸르파파" ? mdPU : mdSum;
-  const res =
-    brand === "희연재" ? resHY : brand === "푸르파파" ? resPU : calc(mdSum, 1);
-  const { revenue, totalKg, beanCost, pkgCost, procCost, fix, profit, margin } =
+  const res = brand === "희연재" ? resHY : brand === "푸르파파" ? resPU : resSum;
+  const { cash, bizRevenue, vat, totalKg, beanCost, pkgCost, procCost, fix, profit, margin } =
     res;
   const products = [...new Set([...productNames, ...Object.keys(md.kg)])];
   const roastH = cfg.roastSpeed > 0 ? totalKg / cfg.roastSpeed : 0;
   const packH = cfg.packSpeed > 0 ? totalKg / cfg.packSpeed : 0;
 
-  // 부가세 분해 (합산 정산 표시용)
-  // 희연재: 전체 공급가에서 현금(부가세X) 매출을 빼고, 과세분에만 10% 적용
-  const hyTotalNet = mdHY.orderRevenue + mdHY.manualRevenue;
-  const hyCashNet = mdHY.cashRevenue;
-  const hyVatableNet = Math.max(0, hyTotalNet - hyCashNet);
-  const hyVat = Math.round(hyVatableNet * 0.1);
-  const hyGross = hyVatableNet + hyVat + hyCashNet;
-  // 푸르파파: 납품 매출(부가세 포함) 기준
-  const puGross = resPU.revenue;
-  const puCashNet = mdPU.cashRevenue;
-  const puVatableGross = Math.max(0, puGross - puCashNet);
-  const puVatableNet = Math.round(puVatableGross / 1.1);
-  const puVat = puVatableGross - puVatableNet;
-  const puNet = puVatableNet + puCashNet;
+  // 브랜드별 정산 표시값 (회사 매출=공급가·현금 제외 / 부가세=내야 할 것 / 현금=개인)
+  const hyBiz = resHY.bizRevenue,
+    hyVat = resHY.vat,
+    hyCash = resHY.cash;
+  const puBiz = resPU.bizRevenue,
+    puVat = resPU.vat,
+    puCash = resPU.cash;
+  const hyBilled = hyBiz + hyVat + hyCash; // 실제 청구·수령 합계(참고)
+  const puBilled = puBiz + puVat + puCash;
+  const vatToPay = hyVat + puVat; // 내야 할 부가세 합계
+  const cashPersonal = hyCash + puCash; // 현금 개인 수익 합계
 
   // 예상 세금 (합산 실질이익 기준 · 참고용) — 법인세 9%/19% 누진 + 지방소득세 10%
   const sumProfit = resHY.profit + resPU.profit;
@@ -314,17 +341,9 @@ tr.em td{background:#ecfdf5;font-weight:700;}
     }<br>${SUPPLIER.address}<br>${SUPPLIER.bizType} / ${SUPPLIER.bizItem}${
       SUPPLIER.email ? ` · ${SUPPLIER.email}` : ""
     }</div>
-<h2>매출</h2>
+<h2>회사 수익</h2>
 <table><thead><tr><th>항목</th><th class="r">희연재</th><th class="r">푸르파파</th><th class="r">합계</th></tr></thead><tbody>
-${row("과세 매출(공급가)", hyVatableNet, puVatableNet)}
-${row("부가세(10%)", hyVat, puVat)}
-${row("현금 매출(부가세 없음)", hyCashNet, puCashNet)}
-<tr class="em"><td>매출 합계</td><td class="r">${won(hyGross)}</td><td class="r">${won(
-      puGross
-    )}</td><td class="r">${won(hyGross + puGross)}</td></tr>
-</tbody></table>
-<h2>원가 · 이익</h2>
-<table><thead><tr><th>항목</th><th class="r">희연재</th><th class="r">푸르파파</th><th class="r">합계</th></tr></thead><tbody>
+${row("회사 매출(공급가·현금 제외)", hyBiz, puBiz)}
 ${neg("원두원가", resHY.beanCost, resPU.beanCost)}
 ${neg("포장재", resHY.pkgCost, resPU.pkgCost)}
 ${neg("가공비", resHY.procCost, resPU.procCost)}
@@ -333,6 +352,14 @@ ${neg("고정비", resHY.fix, resPU.fix)}
       resPU.profit
     )}</td><td class="r">${won(resHY.profit + resPU.profit)}</td></tr>
 </tbody></table>
+<h2>따로 빼둘 것 (수익 아님)</h2>
+<table><thead><tr><th>항목</th><th class="r">희연재</th><th class="r">푸르파파</th><th class="r">합계</th></tr></thead><tbody>
+${row("내야 할 부가세(10%)", hyVat, puVat)}
+${row("현금 매출(대표님 개인)", hyCash, puCash)}
+<tr class="em"><td>실제 청구·수령 합계</td><td class="r">${won(hyBilled)}</td><td class="r">${won(
+      puBilled
+    )}</td><td class="r">${won(hyBilled + puBilled)}</td></tr>
+</tbody></table>
 <h2>예상 세금 · 세후 이익 (참고)</h2>
 <table><tbody>
 <tr><td>과세소득 (실질이익)</td><td class="r">${won(taxBase)}</td></tr>
@@ -340,7 +367,7 @@ ${neg("고정비", resHY.fix, resPU.fix)}
 <tr><td>지방소득세 (법인세의 10%)</td><td class="r n">-${won(localTax)}</td></tr>
 <tr class="total"><td>세후 이익</td><td class="r">${won(afterTax)}</td></tr>
 </tbody></table>
-<div class="foot">※ 부가세는 과세 거래처에만 10% 적용(현금 제외). 세금은 참고용 추정치이며, 실제 세액은 인건비·감가상각·세액공제·중간예납 등으로 달라집니다. 법인세는 사업연도 기준 연 1회 신고 — 정확한 신고는 세무사 확인 권장.</div>
+<div class="foot">※ 실질이익 = 회사 매출(공급가·현금 제외) − 전체 원가. 부가세(과세분 10%)와 현금 매출(대표님 개인)은 수익에서 빼서 따로 표시했고, 현금 판매분의 원가는 회사 비용에 그대로 반영됩니다. 세금은 참고용 추정치이며, 실제 세액은 인건비·감가상각·세액공제·중간예납 등으로 달라집니다. 법인세는 사업연도 기준 연 1회 신고 — 정확한 신고는 세무사 확인 권장.</div>
 <div class="issued">발행일 ${issued}</div>
 </body></html>`;
     const w = window.open("", "_blank", "width=820,height=1040");
@@ -428,20 +455,10 @@ ${neg("고정비", resHY.fix, resPU.fix)}
       {/* 수익 요약 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
         {metric(
-          brand === "푸르파파"
-            ? "매출 (부가세 포함)"
-            : brand === "합산"
-            ? "매출 (합산)"
-            : "매출",
-          won(revenue),
+          "매출 (회사)",
+          won(bizRevenue),
           "bg-emerald-50 border-emerald-100",
-          brand === "희연재"
-            ? `주문 ${won(md.orderRevenue)} + 수기 ${won(md.manualRevenue)}`
-            : brand === "푸르파파"
-            ? `공급가 ${won(Math.round(revenue / 1.1))} + 부가세 ${won(
-                revenue - Math.round(revenue / 1.1)
-              )}`
-            : `희연재 ${won(resHY.revenue)} + 푸르파파 ${won(resPU.revenue)}`
+          cash > 0 ? `현금 ${won(cash)} 제외 · VAT 별도` : "공급가 · VAT 별도"
         )}
         {metric(
           "실질이익",
@@ -455,6 +472,21 @@ ${neg("고정비", resHY.fix, resPU.fix)}
           `${(roastH + packH).toFixed(1)}h`,
           "bg-white border-stone-200",
           `로스팅 ${roastH.toFixed(1)} + 포장 ${packH.toFixed(1)}`
+        )}
+      </div>
+      {/* 따로 빼둘 것: 내야 할 부가세 · 현금(개인 수익) */}
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        {metric(
+          "📌 내야 할 부가세",
+          won(vat),
+          "bg-sky-50 border-sky-200",
+          "수익 아님 · 따로 빼둘 금액"
+        )}
+        {metric(
+          "💵 현금 수익 (개인)",
+          won(cash),
+          "bg-violet-50 border-violet-200",
+          "원가 0 · 대표님 몫 · 이익서 제외"
         )}
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
@@ -540,53 +572,21 @@ ${neg("고정비", resHY.fix, resPU.fix)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
-                <tr>
-                  <td className="px-3 py-2 text-stone-600">과세 매출 (공급가)</td>
-                  <td className="px-2 py-2 text-right tabular-nums">
-                    {won(hyVatableNet)}
-                  </td>
-                  <td className="px-2 py-2 text-right tabular-nums">
-                    {won(puVatableNet)}
-                  </td>
-                  <td className="px-2 py-2 text-right tabular-nums font-medium">
-                    {won(hyVatableNet + puVatableNet)}
-                  </td>
-                </tr>
-                <tr className="text-stone-500">
-                  <td className="px-3 py-2">부가세 (10%)</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{won(hyVat)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{won(puVat)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums font-medium">
-                    {won(hyVat + puVat)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 text-stone-600">
-                    현금 매출{" "}
-                    <span className="text-[11px] text-stone-400">(부가세 없음)</span>
-                  </td>
-                  <td className="px-2 py-2 text-right tabular-nums">
-                    {hyCashNet ? won(hyCashNet) : "·"}
-                  </td>
-                  <td className="px-2 py-2 text-right tabular-nums">
-                    {puCashNet ? won(puCashNet) : "·"}
-                  </td>
-                  <td className="px-2 py-2 text-right tabular-nums font-medium">
-                    {hyCashNet + puCashNet ? won(hyCashNet + puCashNet) : "·"}
-                  </td>
-                </tr>
-                <tr className="bg-emerald-50/50">
+                <tr className="bg-emerald-50/40">
                   <td className="px-3 py-2 font-semibold text-stone-700">
-                    매출 합계
+                    회사 매출{" "}
+                    <span className="text-[11px] text-stone-400">
+                      (공급가 · 현금 제외)
+                    </span>
                   </td>
-                  <td className="px-2 py-2 text-right tabular-nums font-semibold">
-                    {won(hyGross)}
+                  <td className="px-2 py-2 text-right tabular-nums font-medium">
+                    {won(hyBiz)}
                   </td>
-                  <td className="px-2 py-2 text-right tabular-nums font-semibold">
-                    {won(puGross)}
+                  <td className="px-2 py-2 text-right tabular-nums font-medium">
+                    {won(puBiz)}
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums font-bold text-emerald-700">
-                    {won(hyGross + puGross)}
+                    {won(hyBiz + puBiz)}
                   </td>
                 </tr>
                 {(
@@ -627,9 +627,60 @@ ${neg("고정비", resHY.fix, resPU.fix)}
               </tfoot>
             </table>
           </div>
+          {/* 따로 빼둘 것 (수익 아님) */}
+          <div className="border-t border-stone-100 overflow-x-auto">
+            <div className="px-3 pt-2 text-[11px] font-semibold text-stone-500">
+              따로 빼둘 것 (수익 아님)
+            </div>
+            <table className="w-full text-sm border-collapse">
+              <tbody className="divide-y divide-stone-100">
+                <tr>
+                  <td className="px-3 py-2 text-stone-600">
+                    📌 내야 할 부가세{" "}
+                    <span className="text-[11px] text-stone-400">(10%)</span>
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">{won(hyVat)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{won(puVat)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-semibold text-sky-700">
+                    {won(vatToPay)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 text-stone-600">
+                    💵 현금 매출{" "}
+                    <span className="text-[11px] text-stone-400">
+                      (대표님 개인 · 이익서 제외)
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {hyCash ? won(hyCash) : "·"}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {puCash ? won(puCash) : "·"}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums font-semibold text-violet-700">
+                    {cashPersonal ? won(cashPersonal) : "·"}
+                  </td>
+                </tr>
+                <tr className="text-stone-400 text-xs">
+                  <td className="px-3 py-2">참고 · 실제 청구·수령 합계</td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {won(hyBilled)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {won(puBilled)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {won(hyBilled + puBilled)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div className="px-4 py-2 text-[11px] text-stone-400 leading-relaxed">
-            ※ 부가세는 <b>과세 거래처에만 10%</b> 적용 (현금 거래처는 제외).
-            푸르파파는 납품 매출(부가세 별도→포함) 기준. 실질이익은 기존 수익 계산과 동일해요.
+            ※ 실질이익 = <b>회사 매출(공급가·현금 제외) − 전체 원가</b>. 부가세(과세분 10%)와
+            현금 매출(대표님 개인)은 수익에서 빼서 따로 표시했어요.{" "}
+            <b>현금 판매분의 원가는 회사 비용에 그대로 반영</b>됩니다.
           </div>
         </div>
       )}
