@@ -16,6 +16,7 @@ import {
   addManualRoast,
   removeManualRoast,
   updateManualAmount,
+  setManualCash,
 } from "../roasting/actions";
 
 export type MonthAgg = {
@@ -30,6 +31,7 @@ export type PuEntry = {
   qtys: Record<string, number>;
   roastDate: string;
   amount: number;
+  cash?: boolean; // 현금 매출(희연재 수기)
 };
 export type HyDetailRow = {
   account: string;
@@ -843,11 +845,27 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
                   className="flex items-center gap-2 bg-stone-50 rounded-lg border border-stone-200 px-3 py-2"
                 >
                   <span className="text-sm font-medium text-stone-800 min-w-[80px] truncate">
+                    {e.cash && (
+                      <span className="mr-1 text-[10px] font-bold text-violet-700 bg-violet-100 rounded px-1 py-0.5 align-middle">
+                        현금
+                      </span>
+                    )}
                     {e.account || "(수기)"}
                   </span>
                   <span className="flex-1 text-xs text-stone-500 truncate">
                     {kgs || "—"}
                   </span>
+                  <button
+                    onClick={() => setManualCash(e.id, !e.cash).then(refresh)}
+                    title="현금 매출 표시 (대표님 개인 수익)"
+                    className={`text-xs font-semibold rounded-md px-2 py-1 border whitespace-nowrap ${
+                      e.cash
+                        ? "bg-violet-600 border-violet-600 text-white"
+                        : "bg-white border-stone-300 text-stone-500 hover:border-violet-400"
+                    }`}
+                  >
+                    현금
+                  </button>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -880,7 +898,8 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
               );
             })}
             <div className="text-[11px] text-stone-400">
-              로스팅에서 수기로 넣은 주문이에요. 여기서 총금액(매출)을 입력하면 매출·수익에 바로 반영돼요.
+              로스팅에서 수기로 넣은 주문이에요. 총금액(매출)을 입력하면 매출·수익에 반영되고,{" "}
+              <b className="text-violet-600">현금</b> 표시하면 대표님 개인 수익으로 빠져요.
             </div>
           </div>
         </div>

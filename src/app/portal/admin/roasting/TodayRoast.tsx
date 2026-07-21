@@ -8,6 +8,7 @@ import {
   updateManualRoast,
   removeManualRoast,
   setManualDone,
+  setManualCash,
   clearManualMonth,
   migrateManualRoast,
 } from "./actions";
@@ -30,6 +31,7 @@ type Entry = {
   ts: string; // 생성 ISO
   amount: number; // 매출 금액(원)
   accountId?: string; // 연결된 기존 거래처(b2b_accounts) id
+  cash?: boolean; // 현금 매출 여부
 };
 type Account = { id: string; name: string };
 
@@ -65,6 +67,7 @@ export default function TodayRoast({
   const [account, setAccount] = useState("");
   const [vals, setVals] = useState<Record<string, string>>({});
   const [amount, setAmount] = useState("");
+  const [cashInput, setCashInput] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
   const [month, setMonth] = useState(monthKey);
 
@@ -106,15 +109,18 @@ export default function TodayRoast({
     const acc = account.trim();
     const amt = Math.max(0, Math.round(Number(amount) || 0));
     const accountId = accounts.find((a) => a.name === acc)?.id ?? null;
+    const cash = cashInput;
     setAccount("");
     setVals({});
     setAmount("");
+    setCashInput(false);
     addManualRoast({
       account: acc,
       qtys,
       roastDate: batchKey,
       amount: amt,
       accountId,
+      cash,
     }).then(refresh);
   }
   function remove(id: string) {
@@ -124,12 +130,16 @@ export default function TodayRoast({
     const cur = entries.find((e) => e.id === id);
     setManualDone(id, !cur?.done).then(refresh);
   }
+  function toggleCash(e: Entry) {
+    setManualCash(e.id, !e.cash).then(refresh);
+  }
 
   // ── 수기 행 인라인 수정 ──
   const [editId, setEditId] = useState<string | null>(null);
   const [eAccount, setEAccount] = useState("");
   const [eVals, setEVals] = useState<Record<string, string>>({});
   const [eAmount, setEAmount] = useState("");
+  const [eCash, setECash] = useState(false);
 
   function startEdit(e: Entry) {
     setEditId(e.id);
@@ -138,12 +148,14 @@ export default function TodayRoast({
     for (const c of columns) v[c] = e.qtys[c] ? String(e.qtys[c]) : "";
     setEVals(v);
     setEAmount(e.amount ? String(e.amount) : "");
+    setECash(e.cash === true);
   }
   function cancelEdit() {
     setEditId(null);
     setEAccount("");
     setEVals({});
     setEAmount("");
+    setECash(false);
   }
   function saveEdit(id: string) {
     const qtys: Record<string, number> = {};
@@ -154,10 +166,15 @@ export default function TodayRoast({
     const acc = eAccount.trim();
     const amt = Math.max(0, Math.round(Number(eAmount) || 0));
     const accountId = accounts.find((a) => a.name === acc)?.id ?? null;
+    const cash = eCash;
     cancelEdit();
-    updateManualRoast(id, { account: acc, qtys, amount: amt, accountId }).then(
-      refresh
-    );
+    updateManualRoast(id, {
+      account: acc,
+      qtys,
+      amount: amt,
+      accountId,
+      cash,
+    }).then(refresh);
   }
 
   // 현재 배치에 속한 수기 (배치일 일치 또는 날짜없는 레거시)
@@ -292,6 +309,15 @@ export default function TodayRoast({
                     ))}
                     <td className="px-2 py-2 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
+                        <label className="flex items-center gap-0.5 text-xs text-stone-600 cursor-pointer select-none mr-1">
+                          <input
+                            type="checkbox"
+                            checked={eCash}
+                            onChange={(ev) => setECash(ev.target.checked)}
+                            className="h-3.5 w-3.5 accent-violet-600"
+                          />
+                          현금
+                        </label>
                         <input
                           type="number"
                           inputMode="numeric"
@@ -333,12 +359,24 @@ export default function TodayRoast({
                           🔗
                         </span>
                       )}
+                      {e.cash && (
+                        <span
+                          title="현금 매출"
+                          className="mr-1 text-[10px] font-bold text-violet-700 bg-violet-100 rounded px-1 py-0.5 align-middle"
+                        >
+                          현금
+                        </span>
+                      )}
                       <span className={e.done ? "line-through text-stone-400" : ""}>
                         {e.account || "—"}
                       </span>
-                      {e.amount > 0 && (
+                      {e.amount > 0 ? (
                         <span className="ml-1.5 text-xs font-normal text-stone-400">
                           {e.amount.toLocaleString()}원
+                        </span>
+                      ) : (
+                        <span className="ml-1.5 text-xs font-normal text-rose-400">
+                          금액미입력
                         </span>
                       )}
                     </td>
@@ -363,6 +401,17 @@ export default function TodayRoast({
                       </td>
                     ))}
                     <td className="px-2 py-2 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => toggleCash(e)}
+                        title="현금 매출 표시"
+                        className={`text-xs font-semibold rounded-md px-2 py-1 mr-1 border ${
+                          e.cash
+                            ? "bg-violet-600 border-violet-600 text-white"
+                            : "bg-white border-stone-300 text-stone-500 hover:border-violet-400"
+                        }`}
+                      >
+                        현금
+                      </button>
                       <button
                         onClick={() => startEdit(e)}
                         className="text-xs font-semibold rounded-md px-2 py-1 mr-1 bg-stone-100 text-stone-600 hover:bg-stone-200"
@@ -477,12 +526,30 @@ export default function TodayRoast({
               />
               <span className="text-xs text-stone-400">원</span>
             </div>
+            <label
+              className={`flex items-center gap-1 h-9 px-2.5 rounded-lg border cursor-pointer select-none text-sm ${
+                cashInput
+                  ? "border-violet-400 bg-violet-50 text-violet-700 font-semibold"
+                  : "border-stone-300 text-stone-500"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={cashInput}
+                onChange={(e) => setCashInput(e.target.checked)}
+                className="h-3.5 w-3.5 accent-violet-600"
+              />
+              현금
+            </label>
             <button
               onClick={add}
               className="h-9 rounded-lg bg-amber-700 text-white text-sm font-semibold px-5 hover:bg-amber-800"
             >
               추가
             </button>
+          </div>
+          <div className="text-[11px] text-stone-400 mt-1.5">
+            💡 현금 체크 = 대표님 개인 수익(수익 계산 제외). 금액은 나중에 각 행의 <b>수정</b>으로 채워도 돼요.
           </div>
         </div>
       </div>
@@ -606,6 +673,15 @@ export default function TodayRoast({
                               />
                             </td>
                             <td className="px-2 py-2 text-center whitespace-nowrap" colSpan={2}>
+                              <label className="inline-flex items-center gap-0.5 text-xs text-stone-600 cursor-pointer select-none mr-2">
+                                <input
+                                  type="checkbox"
+                                  checked={eCash}
+                                  onChange={(ev) => setECash(ev.target.checked)}
+                                  className="h-3.5 w-3.5 accent-violet-600"
+                                />
+                                현금
+                              </label>
                               <button
                                 onClick={() => saveEdit(e.id)}
                                 className="text-xs font-semibold rounded-md px-2 py-1.5 bg-amber-700 text-white hover:bg-amber-800 mr-1"
@@ -626,6 +702,14 @@ export default function TodayRoast({
                               {fmtDay(e.roastDate)}
                             </td>
                             <td className="px-2 py-2 text-sm text-stone-700 whitespace-nowrap">
+                              {e.cash && (
+                                <span
+                                  title="현금 매출"
+                                  className="mr-1 text-[10px] font-bold text-violet-700 bg-violet-100 rounded px-1 py-0.5 align-middle"
+                                >
+                                  현금
+                                </span>
+                              )}
                               {e.accountId && (
                                 <span title="기존 거래처 연결됨" className="mr-1 align-middle">
                                   🔗
@@ -659,6 +743,17 @@ export default function TodayRoast({
                               />
                             </td>
                             <td className="px-2 py-2 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => toggleCash(e)}
+                                title="현금 매출 표시"
+                                className={`text-xs font-semibold mr-2 ${
+                                  e.cash
+                                    ? "text-violet-700"
+                                    : "text-stone-400 hover:text-violet-600"
+                                }`}
+                              >
+                                현금
+                              </button>
                               <button
                                 onClick={() => startEdit(e)}
                                 className="text-xs font-semibold text-stone-500 hover:text-amber-700 mr-2"

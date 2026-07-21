@@ -19,6 +19,7 @@ export async function addManualRoast(input: {
   amount?: number;
   brand?: string; // '희연재'(기본) | '푸르파파'
   accountId?: string | null; // 기존 거래처(b2b_accounts) 연결 (선택)
+  cash?: boolean; // 현금 매출 여부 (희연재)
 }): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   const admin = createAdminClient();
@@ -29,7 +30,21 @@ export async function addManualRoast(input: {
     amount: Math.max(0, Math.round(Number(input.amount) || 0)),
     brand: input.brand === "푸르파파" ? "푸르파파" : "희연재",
     account_id: input.accountId || null,
+    cash: input.cash === true,
   });
+  revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/profit");
+  return { ok: true };
+}
+
+/** 수기 행 현금 여부만 토글 (목록에서 체크) */
+export async function setManualCash(
+  id: string,
+  cash: boolean
+): Promise<{ ok: boolean }> {
+  if (!(await isAdmin())) return { ok: false };
+  const admin = createAdminClient();
+  await admin.from("roast_manual").update({ cash: cash === true }).eq("id", id);
   revalidatePath("/portal/admin/roasting");
   revalidatePath("/portal/admin/profit");
   return { ok: true };
@@ -58,6 +73,7 @@ export async function updateManualRoast(
     qtys: Qtys;
     amount?: number;
     accountId?: string | null;
+    cash?: boolean;
   }
 ): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
@@ -69,6 +85,7 @@ export async function updateManualRoast(
       qtys: input.qtys ?? {},
       amount: Math.max(0, Math.round(Number(input.amount) || 0)),
       account_id: input.accountId || null,
+      ...(input.cash === undefined ? {} : { cash: input.cash === true }),
     })
     .eq("id", id);
   revalidatePath("/portal/admin/roasting");
