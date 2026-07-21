@@ -433,6 +433,79 @@ async function notifyStatusToBuyers(
   }
 }
 
+/**
+ * 거래처 행(로스팅)의 '보낸 수량'을 기록. 품목별 총 보낸 수량을 받아
+ * 해당 거래처의 이 배치 주문들에 순서대로(오래된 주문부터) 채워 분배한다.
+ * 로스팅 목록은 '주문 − 보냄'(안 보낸 나머지)만 표시.
+ */
+export async function setAccountShipped(
+  orderIds: string[],
+  shipped: Record<string, number>
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  if (!orderIds.length) return { ok: true };
+
+  const admin = createAdminClient();
+  const [{ data: ords }, { data: its }] = await Promise.all([
+    admin.from("b2b_orders").select("id, created_at, shipped").in("id", orderIds),
+    admin
+      .from("b2b_order_items")
+      .select("order_id, product_name, qty")
+      .in("order_id", orderIds),
+  ]);
+
+  // 주문별·품목별 주문수량(용량)
+  const cap = new Map<string, Map<string, number>>();
+  for (const it of its ?? []) {
+    const oid = it.order_id as string;
+    const m = cap.get(oid) ?? new Map<string, number>();
+    const pn = it.product_name as string;
+    m.set(pn, (m.get(pn) ?? 0) + ((it.qty as number) ?? 0));
+    cap.set(oid, m);
+  }
+
+  const sorted = [...(ords ?? [])].sort((a, b) =>
+    String(a.created_at).localeCompare(String(b.created_at))
+  );
+  // 기존 shipped 에서 시작 (편집한 품목만 덮어씀)
+  const shippedByOrder = new Map<string, Record<string, number>>(
+    sorted.map((o) => [
+      o.id as string,
+      { ...((o.shipped as Record<string, number>) ?? {}) },
+    ])
+  );
+
+  for (const [product, raw] of Object.entries(shipped)) {
+    let left = Math.max(0, Math.round(Number(raw) || 0));
+    for (const o of sorted) {
+      const capacity = cap.get(o.id as string)?.get(product) ?? 0;
+      const assign = Math.min(capacity, left);
+      const s = shippedByOrder.get(o.id as string)!;
+      if (assign > 0) s[product] = assign;
+      else delete s[product];
+      left -= assign;
+    }
+    // 주문량보다 많이 보낸 경우(초과분)는 마지막 주문에 얹어 기록
+    if (left > 0 && sorted.length) {
+      const last = sorted[sorted.length - 1].id as string;
+      const s = shippedByOrder.get(last)!;
+      s[product] = (s[product] ?? 0) + left;
+    }
+  }
+
+  for (const o of sorted) {
+    const { error } = await admin
+      .from("b2b_orders")
+      .update({ shipped: shippedByOrder.get(o.id as string) ?? {} })
+      .eq("id", o.id);
+    if (error) return { ok: false, error: error.message };
+  }
+  revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/orders");
+  return { ok: true };
+}
+
 /** 여러 주문의 상태를 한 번에 변경 (로스팅 목록의 거래처별 일괄 처리용) */
 export async function updateOrdersStatus(
   orderIds: string[],

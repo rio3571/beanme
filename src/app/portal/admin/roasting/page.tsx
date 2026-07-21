@@ -19,6 +19,7 @@ type OrderRow = {
   status: string;
   created_at: string;
   unit: string | null;
+  shipped: Record<string, number> | null;
 };
 type ItemRow = {
   order_id: string;
@@ -50,7 +51,7 @@ export default async function RoastingPage() {
   ] = await Promise.all([
     admin
       .from("b2b_orders")
-      .select("id, account_id, status, created_at, unit")
+      .select("id, account_id, status, created_at, unit, shipped")
       .not("status", "in", "(canceled,done)")
       .order("created_at", { ascending: false })
       .limit(300),
@@ -137,7 +138,8 @@ export default async function RoastingPage() {
   type AcctAgg = {
     name: string;
     orderIds: string[];
-    qty: Map<string, number>;
+    qty: Map<string, number>; // 주문 수량
+    shipped: Map<string, number>; // 보낸 수량
     status: string; // 가장 진행 안 된 상태
   };
   type Batch = { key: string; accounts: Map<string, AcctAgg>; order: string[] };
@@ -159,6 +161,7 @@ export default async function RoastingPage() {
         name: o.unit ? `${base} ${o.unit}` : base,
         orderIds: [],
         qty: new Map(),
+        shipped: new Map(),
         status: "done",
       };
       b.accounts.set(gid, a);
@@ -174,6 +177,10 @@ export default async function RoastingPage() {
     for (const it of itemsByOrder.get(o.id) ?? []) {
       a.qty.set(it.product_name, (a.qty.get(it.product_name) ?? 0) + (it.qty ?? 0));
     }
+    // 보낸 수량 누적
+    for (const [pn, sq] of Object.entries(o.shipped ?? {})) {
+      a.shipped.set(pn, (a.shipped.get(pn) ?? 0) + (Number(sq) || 0));
+    }
   }
 
   // 날짜 정렬: 오늘 이후(가까운 순) → 지난(최근 순)
@@ -188,20 +195,31 @@ export default async function RoastingPage() {
 
   // 현재 로스팅 배치(다음 화/목) → 클라이언트 표(수기 추가 포함)로 렌더
   const todayBatch = batchMap.get(roastAnchor);
-  const todayOrderRows = todayBatch
+  const todayOrderRows = (todayBatch
     ? todayBatch.order.map((aid) => {
         const a = todayBatch.accounts.get(aid)!;
-        const qtys: Record<string, number> = {};
-        for (const c of columns) qtys[c] = a.qty.get(c) ?? 0;
+        const orderedQ: Record<string, number> = {};
+        const shippedQ: Record<string, number> = {};
+        const qtys: Record<string, number> = {}; // 남은 수량(주문−보냄)
+        for (const c of columns) {
+          const ord = a.qty.get(c) ?? 0;
+          const shp = Math.min(ord, a.shipped.get(c) ?? 0);
+          orderedQ[c] = ord;
+          shippedQ[c] = shp;
+          qtys[c] = Math.max(0, ord - shp);
+        }
         return {
           accountId: aid,
           name: a.name,
           qtys,
+          orderedQ,
+          shippedQ,
           orderIds: a.orderIds,
           status: a.status,
         };
       })
-    : [];
+    : []
+  ).filter((r) => columns.some((c) => r.qtys[c] > 0)); // 다 보낸 거래처는 숨김
   const otherKeys = ordered.filter((k) => k !== roastAnchor);
 
   return (
@@ -233,13 +251,33 @@ export default async function RoastingPage() {
             const b = batchMap.get(key)!;
             const isToday = key === today;
             const isUpcoming = key >= today;
-            const totals = columns.map((c) =>
-              b.order.reduce(
-                (s, aid) => s + (b.accounts.get(aid)!.qty.get(c) ?? 0),
-                0
-              )
+            // 거래처별 남은 수량(주문−보냄) 계산, 다 보낸 거래처는 숨김
+            const rowsB = b.order
+              .map((aid) => {
+                const a = b.accounts.get(aid)!;
+                const orderedQ = columns.map((c) => a.qty.get(c) ?? 0);
+                const shippedQ = columns.map((c, i) =>
+                  Math.min(orderedQ[i], a.shipped.get(c) ?? 0)
+                );
+                const remaining = orderedQ.map((o, i) =>
+                  Math.max(0, o - shippedQ[i])
+                );
+                return {
+                  aid,
+                  name: a.name,
+                  orderIds: a.orderIds,
+                  status: a.status,
+                  orderedQ,
+                  shippedQ,
+                  remaining,
+                };
+              })
+              .filter((r) => r.remaining.some((v) => v > 0));
+            const totals = columns.map((_, i) =>
+              rowsB.reduce((s, r) => s + r.remaining[i], 0)
             );
             const totalKg = totals.reduce((s, v) => s + v, 0);
+            if (rowsB.length === 0) return null; // 다 보낸 배치는 표시 안 함
             return (
               <div
                 key={key}
@@ -294,18 +332,17 @@ export default async function RoastingPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
-                      {b.order.map((aid) => {
-                        const a = b.accounts.get(aid)!;
-                        return (
-                          <RoastingRow
-                            key={aid}
-                            name={a.name}
-                            orderIds={a.orderIds}
-                            qtys={columns.map((c) => a.qty.get(c) ?? 0)}
-                            status={a.status}
-                          />
-                        );
-                      })}
+                      {rowsB.map((r) => (
+                        <RoastingRow
+                          key={r.aid}
+                          name={r.name}
+                          orderIds={r.orderIds}
+                          columns={columns}
+                          ordered={r.orderedQ}
+                          shipped={r.shippedQ}
+                          status={r.status}
+                        />
+                      ))}
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-stone-200 bg-stone-50">

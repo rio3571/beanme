@@ -15,7 +15,9 @@ import {
 type OrderRow = {
   accountId: string;
   name: string;
-  qtys: Record<string, number>;
+  qtys: Record<string, number>; // 남은 수량(주문−보냄)
+  orderedQ: Record<string, number>; // 주문 수량
+  shippedQ: Record<string, number>; // 보낸 수량
   orderIds: string[];
   status: string;
 };
@@ -254,7 +256,9 @@ export default function TodayRoast({
                   key={r.accountId}
                   name={r.name}
                   orderIds={r.orderIds}
-                  qtys={columns.map((c) => r.qtys[c] ?? 0)}
+                  columns={columns}
+                  ordered={columns.map((c) => r.orderedQ[c] ?? 0)}
+                  shipped={columns.map((c) => r.shippedQ[c] ?? 0)}
                   status={r.status}
                 />
               ))}
