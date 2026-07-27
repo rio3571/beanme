@@ -41,41 +41,101 @@ export default function StatementView({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [inAppWarning, setInAppWarning] = useState(false);
 
   const { supply, vat, total: grand } = vatAmounts(total, vatMode);
 
-  async function savePdf() {
-    if (!ref.current) return;
-    setBusy(true);
-    try {
-      const [{ default: html2canvas }, jspdf] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf"),
-      ]);
-      const JsPDF = jspdf.jsPDF;
-      const canvas = await html2canvas(ref.current, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-      });
-      const img = canvas.toDataURL("image/jpeg", 0.95);
-      const pdf = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageW = 210;
-      const pageH = 297;
-      const imgW = pageW;
-      const imgH = (canvas.height * pageW) / canvas.width;
-      let heightLeft = imgH;
-      let position = 0;
+  const filename = `거래내역서_${buyer?.company_name ?? ""}_${monthYm}.pdf`;
+
+  async function makePdfBlob(): Promise<Blob | null> {
+    if (!ref.current) return null;
+    const [{ default: html2canvas }, jspdf] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
+    const JsPDF = jspdf.jsPDF;
+    const canvas = await html2canvas(ref.current, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+    });
+    const img = canvas.toDataURL("image/jpeg", 0.95);
+    const pdf = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = 210;
+    const pageH = 297;
+    const imgW = pageW;
+    const imgH = (canvas.height * pageW) / canvas.width;
+    let heightLeft = imgH;
+    let position = 0;
+    pdf.addImage(img, "JPEG", 0, position, imgW, imgH);
+    heightLeft -= pageH;
+    while (heightLeft > 0) {
+      position -= pageH;
+      pdf.addPage();
       pdf.addImage(img, "JPEG", 0, position, imgW, imgH);
       heightLeft -= pageH;
-      while (heightLeft > 0) {
-        position -= pageH;
-        pdf.addPage();
-        pdf.addImage(img, "JPEG", 0, position, imgW, imgH);
-        heightLeft -= pageH;
-      }
-      pdf.save(`거래내역서_${buyer?.company_name ?? ""}_${monthYm}.pdf`);
+    }
+    return pdf.output("blob") as Blob;
+  }
+
+  function isKakaoInApp() {
+    return typeof navigator !== "undefined" && /KAKAOTALK/i.test(navigator.userAgent);
+  }
+
+  async function savePdf() {
+    setBusy(true);
+    try {
+      const blob = await makePdfBlob();
+      if (!blob) return;
+      // jsPDF의 내장 save()는 카카오톡 인앱 브라우저 등에서 조용히 실패하는 경우가 있어
+      // Blob + 앵커 클릭 방식으로 직접 다운로드를 트리거한다.
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      if (isKakaoInApp()) setInAppWarning(true);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function sharePdf() {
+    setSharing(true);
+    try {
+      const blob = await makePdfBlob();
+      if (!blob) return;
+      const file = new File([blob], filename, { type: "application/pdf" });
+      const nav = navigator as Navigator & {
+        canShare?: (data?: ShareData) => boolean;
+        share?: (data: ShareData) => Promise<void>;
+      };
+      if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
+        await nav.share({
+          files: [file],
+          title: "거래명세서",
+          text: `${buyer?.company_name ?? ""} ${ymLabel(monthYm)} 거래명세서`,
+        });
+      } else {
+        // 공유 API 미지원 브라우저 — 새 탭에서 열어 거기서 저장/공유하도록 안내
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        if (isKakaoInApp()) {
+          setInAppWarning(true);
+        } else {
+          alert("이 브라우저는 공유 기능을 지원하지 않아 새 탭에서 열었어요. 거기서 저장하거나 공유해주세요.");
+        }
+      }
+    } catch (err) {
+      if ((err as Error)?.name !== "AbortError") {
+        alert("공유 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -96,7 +156,19 @@ export default function StatementView({
 
   return (
     <div>
-      <div className="flex gap-2 mb-3">
+      {inAppWarning && (
+        <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs sm:text-sm px-4 py-3">
+          ⚠️ 카카오톡 안에서 열려 있으면 다운로드·공유가 안 될 수 있어요. 우측 상단 <b>≡ 메뉴 → &quot;다른 브라우저로 열기&quot;</b>를 눌러 Chrome/Safari로 열어주세요.
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <button
+          onClick={sharePdf}
+          disabled={sharing || rows.length === 0}
+          className="rounded-xl bg-[#FEE500] text-[#3C1E1E] font-semibold px-5 py-2.5 text-sm disabled:opacity-40"
+        >
+          {sharing ? "준비 중…" : "📤 카톡 등으로 공유"}
+        </button>
         <button
           onClick={savePdf}
           disabled={busy || rows.length === 0}
