@@ -108,31 +108,40 @@ export default function StatementView({
     try {
       const blob = await makePdfBlob();
       if (!blob) return;
-      const file = new File([blob], filename, { type: "application/pdf" });
-      const nav = navigator as Navigator & {
-        canShare?: (data?: ShareData) => boolean;
-        share?: (data: ShareData) => Promise<void>;
-      };
-      if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
-        await nav.share({
-          files: [file],
-          title: "거래명세서",
-          text: `${buyer?.company_name ?? ""} ${ymLabel(monthYm)} 거래명세서`,
-        });
-      } else {
-        // 공유 API 미지원 브라우저 — 새 탭에서 열어 거기서 저장/공유하도록 안내
+
+      let shared = false;
+      try {
+        const file = new File([blob], filename, { type: "application/pdf" });
+        const nav = navigator as Navigator & {
+          canShare?: (data?: ShareData) => boolean;
+          share?: (data: ShareData) => Promise<void>;
+        };
+        if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
+          await nav.share({
+            files: [file],
+            title: "거래명세서",
+            text: `${buyer?.company_name ?? ""} ${ymLabel(monthYm)} 거래명세서`,
+          });
+          shared = true;
+        }
+      } catch (err) {
+        // 사용자가 공유 시트를 취소한 경우는 정상 흐름 — 폴백 없이 조용히 종료
+        if ((err as Error)?.name === "AbortError") {
+          shared = true;
+        }
+        // 그 외 실패(데스크톱 브라우저에 공유 대상 앱이 없는 경우 등)는 아래 새 탭 폴백으로 이어간다
+      }
+
+      if (!shared) {
+        // 공유 API 미지원·실패 — 새 탭에서 열어 거기서 저장/공유하도록 안내
         const url = URL.createObjectURL(blob);
         window.open(url, "_blank");
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
         if (isKakaoInApp()) {
           setInAppWarning(true);
         } else {
-          alert("이 브라우저는 공유 기능을 지원하지 않아 새 탭에서 열었어요. 거기서 저장하거나 공유해주세요.");
+          alert("공유 대신 새 탭에서 PDF를 열었어요. 거기서 저장하거나 다른 방법으로 공유해주세요.");
         }
-      }
-    } catch (err) {
-      if ((err as Error)?.name !== "AbortError") {
-        alert("공유 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       }
     } finally {
       setSharing(false);
