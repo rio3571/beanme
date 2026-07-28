@@ -51,7 +51,7 @@ export default function StatementView({
   async function makePdfBlob(): Promise<Blob | null> {
     if (!ref.current) return null;
     const [{ default: html2canvas }, jspdf] = await Promise.all([
-      import("html2canvas"),
+      import("html2canvas-pro"),
       import("jspdf"),
     ]);
     const JsPDF = jspdf.jsPDF;
@@ -98,6 +98,9 @@ export default function StatementView({
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
       if (isKakaoInApp()) setInAppWarning(true);
+    } catch (err) {
+      console.error("PDF 생성 실패:", err);
+      alert(`PDF 생성 중 오류가 발생했습니다: ${(err as Error)?.message ?? err}`);
     } finally {
       setBusy(false);
     }
@@ -143,6 +146,9 @@ export default function StatementView({
           alert("공유 대신 새 탭에서 PDF를 열었어요. 거기서 저장하거나 다른 방법으로 공유해주세요.");
         }
       }
+    } catch (err) {
+      console.error("PDF 생성 실패:", err);
+      alert(`PDF 생성 중 오류가 발생했습니다: ${(err as Error)?.message ?? err}`);
     } finally {
       setSharing(false);
     }
