@@ -1,8 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StatementView, { type StmtRow } from "@/components/StatementView";
 import { VAT_MODES, VAT_LABEL, DEFAULT_VAT, type VatMode } from "@/lib/vat";
+
+const EMAIL_STORE_PREFIX = "beanme_quick_email::";
+
+function emailStoreKey(companyName: string) {
+  return EMAIL_STORE_PREFIX + companyName.trim();
+}
 
 export type ManualEntry = {
   id: string;
@@ -67,6 +73,21 @@ export default function QuickStatementForm({
   const [manualQuery, setManualQuery] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [imported, setImported] = useState<Set<string>>(new Set());
+
+  // 거래처명을 입력/선택하면, 예전에 이 거래처명으로 저장해둔 이메일이 있으면 자동으로 채워준다.
+  useEffect(() => {
+    const name = companyName.trim();
+    if (!name) return;
+    const saved = typeof window !== "undefined" ? localStorage.getItem(emailStoreKey(name)) : null;
+    if (saved && !email) setEmail(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyName]);
+
+  function saveEmailForCompany(sentTo: string) {
+    const name = companyName.trim();
+    if (!name || typeof window === "undefined") return;
+    localStorage.setItem(emailStoreKey(name), sentTo);
+  }
 
   function updateRow(id: string, patch: Partial<Row>) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -353,6 +374,7 @@ export default function QuickStatementForm({
         total={total}
         vatMode={vatMode}
         periodLabel={periodLabel}
+        onSaveEmail={saveEmailForCompany}
       />
     </div>
   );

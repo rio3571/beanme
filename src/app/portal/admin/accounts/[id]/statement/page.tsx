@@ -5,6 +5,7 @@ import { loadStatement } from "@/lib/statement";
 import { ymLabel } from "@/lib/format";
 import StatementView from "@/components/StatementView";
 import IssueTaxButton from "./IssueTaxButton";
+import { updateAccountEmail } from "../../../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,7 @@ export default async function AdminStatementPage({
         total={total}
         vatMode={vatMode}
         periodLabel={periodLabel}
+        onSaveEmail={updateAccountEmail.bind(null, id)}
       />
     </div>
   );

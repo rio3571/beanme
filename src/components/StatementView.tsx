@@ -32,6 +32,7 @@ export default function StatementView({
   total,
   vatMode = DEFAULT_VAT,
   periodLabel,
+  onSaveEmail,
 }: {
   buyer: StmtBuyer;
   monthYm: string;
@@ -39,6 +40,8 @@ export default function StatementView({
   total: number;
   vatMode?: VatMode;
   periodLabel?: string;
+  /** 발송 성공 시 이메일을 어딘가에 저장해두고 싶을 때 (거래처 DB, localStorage 등) */
+  onSaveEmail?: (email: string) => void | Promise<unknown>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
@@ -93,6 +96,13 @@ export default function StatementView({
       const data = await res.json();
       if (data.ok) {
         setEmailResult({ ok: true, msg: `${to} 로 발송했습니다.` });
+        if (onSaveEmail) {
+          try {
+            await onSaveEmail(to);
+          } catch {
+            // 저장 실패는 발송 자체를 막을 이유가 없어 조용히 무시
+          }
+        }
       } else {
         setEmailResult({ ok: false, msg: data.error || "발송에 실패했습니다." });
       }

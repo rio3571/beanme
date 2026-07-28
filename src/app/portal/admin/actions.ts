@@ -232,6 +232,23 @@ export async function updateAccountBank(
   return { ok: true };
 }
 
+export async function updateAccountEmail(
+  accountId: string,
+  email: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ email: email.trim() || null })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  revalidatePath(`/portal/admin/accounts/${accountId}/statement`);
+  return { ok: true };
+}
+
 export async function updateAccountTax(
   accountId: string,
   input: {
