@@ -3,6 +3,7 @@
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { revalidatePath } from "next/cache";
+import { DEFAULT_VAT, isVatMode, type VatMode } from "@/lib/vat";
 
 export type QuickAccount = {
   id: string;
@@ -13,6 +14,7 @@ export type QuickAccount = {
   business_no: string | null;
   address: string | null;
   bank: string | null;
+  vat_mode: VatMode;
 };
 
 async function isAdmin() {
@@ -29,7 +31,10 @@ export async function listQuickAccounts(): Promise<QuickAccount[]> {
     .select("*")
     .order("company_name", { ascending: true });
   if (error) return [];
-  return (data ?? []) as QuickAccount[];
+  return (data ?? []).map((a) => ({
+    ...a,
+    vat_mode: isVatMode(a.vat_mode) ? a.vat_mode : DEFAULT_VAT,
+  })) as QuickAccount[];
 }
 
 /** 거래처명 기준으로 upsert (있으면 갱신, 없으면 새로 생성) */
@@ -41,6 +46,7 @@ export async function saveQuickAccount(input: {
   businessNo?: string;
   address?: string;
   bank?: string;
+  vatMode?: VatMode;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!(await isAdmin())) return { ok: false, error: "권한이 없습니다." };
   const companyName = input.companyName.trim();
@@ -58,6 +64,7 @@ export async function saveQuickAccount(input: {
         business_no: input.businessNo?.trim() || null,
         address: input.address?.trim() || null,
         bank: input.bank?.trim() || null,
+        vat_mode: isVatMode(input.vatMode) ? input.vatMode : DEFAULT_VAT,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "company_name" }

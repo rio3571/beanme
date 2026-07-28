@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import StatementView, { type StmtRow } from "@/components/StatementView";
-import { VAT_MODES, VAT_LABEL, DEFAULT_VAT, type VatMode } from "@/lib/vat";
+import { VAT_MODES, VAT_LABEL, VAT_DESC, DEFAULT_VAT, type VatMode } from "@/lib/vat";
 import {
   saveQuickAccount,
   deleteQuickAccount,
@@ -112,6 +112,7 @@ export default function QuickStatementForm({
     setBusinessNo(acc.business_no ?? "");
     setAddress(acc.address ?? "");
     setBank(acc.bank ?? "");
+    setVatMode(acc.vat_mode ?? DEFAULT_VAT);
   }
 
   async function saveCurrentAsQuickAccount() {
@@ -126,6 +127,7 @@ export default function QuickStatementForm({
         businessNo,
         address,
         bank,
+        vatMode,
       });
       if (res.ok) {
         router.refresh();
@@ -305,38 +307,56 @@ export default function QuickStatementForm({
           />
         </div>
 
+        <div className="mt-4">
+          <div className="text-xs font-bold text-amber-700 mb-1">부가세 처리 *</div>
+          <p className="text-xs text-stone-500 mb-2">
+            입력한 단가를 어떤 금액으로 볼지 정합니다. 합계가 이 기준으로 계산됩니다.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-2">
+            {VAT_MODES.map((m) => {
+              const active = vatMode === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setVatMode(m)}
+                  className={`text-left rounded-lg border px-3 py-2.5 transition ${
+                    active
+                      ? "border-amber-600 bg-amber-50 ring-1 ring-amber-200"
+                      : "border-stone-200 hover:border-stone-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${
+                        active ? "border-amber-600 bg-amber-600" : "border-stone-300"
+                      }`}
+                    />
+                    <span className="font-semibold text-stone-800 text-sm">{VAT_LABEL[m]}</span>
+                  </div>
+                  <div className="text-xs text-stone-500 mt-0.5 pl-[22px]">{VAT_DESC[m]}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <button
           onClick={saveCurrentAsQuickAccount}
           disabled={savingAccount || !companyName.trim()}
-          className="mt-3 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold px-4 py-2 text-sm disabled:opacity-40"
+          className="mt-4 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold px-4 py-2 text-sm disabled:opacity-40"
         >
-          {savingAccount ? "저장 중…" : "💾 이 거래처 정보 저장 (다음에 바로 불러오기)"}
+          {savingAccount ? "저장 중…" : "💾 거래처 정보 + 부가세 처리 저장 (다음에 바로 불러오기)"}
         </button>
 
-        <div className="grid sm:grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">기간 표시</label>
-            <input
-              value={periodLabel}
-              onChange={(e) => setPeriodLabel(e.target.value)}
-              placeholder="예: 2026년 7월"
-              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">부가세 모드</label>
-            <select
-              value={vatMode}
-              onChange={(e) => setVatMode(e.target.value as VatMode)}
-              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm bg-white"
-            >
-              {VAT_MODES.map((m) => (
-                <option key={m} value={m}>
-                  {VAT_LABEL[m]}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="mt-4">
+          <label className="text-xs text-stone-500 block mb-1">기간 표시</label>
+          <input
+            value={periodLabel}
+            onChange={(e) => setPeriodLabel(e.target.value)}
+            placeholder="예: 2026년 7월"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+          />
         </div>
       </div>
 
