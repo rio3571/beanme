@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import StatementView, { type StmtRow } from "@/components/StatementView";
 import { VAT_MODES, VAT_LABEL, DEFAULT_VAT, type VatMode } from "@/lib/vat";
+import {
+  saveQuickAccount,
+  deleteQuickAccount,
+  type QuickAccount,
+} from "@/app/portal/admin/quick-statement/actions";
 
 const EMAIL_STORE_PREFIX = "beanme_quick_email::";
 
@@ -56,9 +62,14 @@ function newRow(): Row {
 
 export default function QuickStatementForm({
   manualEntries = [],
+  quickAccounts = [],
 }: {
   manualEntries?: ManualEntry[];
+  quickAccounts?: QuickAccount[];
 }) {
+  const router = useRouter();
+  const [selectedQuickId, setSelectedQuickId] = useState("");
+  const [savingAccount, setSavingAccount] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
@@ -87,6 +98,52 @@ export default function QuickStatementForm({
     const name = companyName.trim();
     if (!name || typeof window === "undefined") return;
     localStorage.setItem(emailStoreKey(name), sentTo);
+  }
+
+  function pickQuickAccount(id: string) {
+    setSelectedQuickId(id);
+    if (!id) return;
+    const acc = quickAccounts.find((a) => a.id === id);
+    if (!acc) return;
+    setCompanyName(acc.company_name);
+    setContactName(acc.contact_name ?? "");
+    setPhone(acc.phone ?? "");
+    setEmail(acc.email ?? "");
+    setBusinessNo(acc.business_no ?? "");
+    setAddress(acc.address ?? "");
+    setBank(acc.bank ?? "");
+  }
+
+  async function saveCurrentAsQuickAccount() {
+    if (!companyName.trim()) return;
+    setSavingAccount(true);
+    try {
+      const res = await saveQuickAccount({
+        companyName,
+        contactName,
+        phone,
+        email,
+        businessNo,
+        address,
+        bank,
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        alert(res.error || "저장에 실패했습니다.");
+      }
+    } finally {
+      setSavingAccount(false);
+    }
+  }
+
+  async function removeSelectedQuickAccount() {
+    if (!selectedQuickId) return;
+    const acc = quickAccounts.find((a) => a.id === selectedQuickId);
+    if (!confirm(`"${acc?.company_name ?? ""}" 간이 거래처를 삭제할까요?`)) return;
+    await deleteQuickAccount(selectedQuickId);
+    setSelectedQuickId("");
+    router.refresh();
   }
 
   function updateRow(id: string, patch: Partial<Row>) {
@@ -175,6 +232,32 @@ export default function QuickStatementForm({
     <div className="space-y-5">
       <div className="bg-white border border-stone-200 rounded-xl p-4 sm:p-5">
         <div className="text-xs font-bold text-amber-700 mb-3">거래처 정보 (수기 입력)</div>
+
+        {quickAccounts.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-3 bg-stone-50 border border-stone-200 rounded-lg p-2.5">
+            <select
+              value={selectedQuickId}
+              onChange={(e) => pickQuickAccount(e.target.value)}
+              className="flex-1 min-w-[180px] rounded-md border border-stone-300 px-2.5 py-1.5 text-sm bg-white"
+            >
+              <option value="">저장된 간이 거래처 선택…</option>
+              {quickAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.company_name}
+                </option>
+              ))}
+            </select>
+            {selectedQuickId && (
+              <button
+                onClick={removeSelectedQuickAccount}
+                className="text-xs text-stone-400 hover:text-red-600 px-2 py-1.5"
+              >
+                삭제
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="grid sm:grid-cols-2 gap-3">
           <input
             value={companyName}
@@ -221,6 +304,14 @@ export default function QuickStatementForm({
             className="rounded-lg border border-stone-300 px-3 py-2 text-sm sm:col-span-2"
           />
         </div>
+
+        <button
+          onClick={saveCurrentAsQuickAccount}
+          disabled={savingAccount || !companyName.trim()}
+          className="mt-3 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 font-semibold px-4 py-2 text-sm disabled:opacity-40"
+        >
+          {savingAccount ? "저장 중…" : "💾 이 거래처 정보 저장 (다음에 바로 불러오기)"}
+        </button>
 
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
