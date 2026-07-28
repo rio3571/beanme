@@ -31,6 +31,7 @@ export default async function PortalLayout({
     ? [
         { href: "/portal/admin/profit", label: "수익관리" },
         { href: "/portal/admin/accounts", label: "거래처 관리" },
+        { href: "/portal/admin/quick-statement", label: "간이 명세서" },
       ]
     : [];
 
