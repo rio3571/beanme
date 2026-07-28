@@ -22,6 +22,7 @@ export type StmtBuyer = {
   business_no: string | null;
   address: string | null;
   bank?: string | null;
+  email?: string | null;
 } | null;
 
 export default function StatementView({
@@ -43,10 +44,64 @@ export default function StatementView({
   const [busy, setBusy] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [inAppWarning, setInAppWarning] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [emailTo, setEmailTo] = useState(buyer?.email ?? "");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailResult, setEmailResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const { supply, vat, total: grand } = vatAmounts(total, vatMode);
 
   const filename = `거래내역서_${buyer?.company_name ?? ""}_${monthYm}.pdf`;
+
+  async function blobToBase64(blob: Blob): Promise<string> {
+    const buf = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+
+  async function sendEmail() {
+    const to = emailTo.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      setEmailResult({ ok: false, msg: "올바른 이메일 주소를 입력해주세요." });
+      return;
+    }
+    setEmailSending(true);
+    setEmailResult(null);
+    try {
+      const blob = await makePdfBlob();
+      if (!blob) {
+        setEmailResult({ ok: false, msg: "PDF 생성에 실패했습니다." });
+        return;
+      }
+      const pdfBase64 = await blobToBase64(blob);
+      const res = await fetch("/api/send-statement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to,
+          subject: `${buyer?.company_name ?? ""} ${periodLabel ?? ymLabel(monthYm)} 거래명세서`,
+          text: `${buyer?.company_name ?? ""}님, ${periodLabel ?? ymLabel(monthYm)} 거래명세서를 첨부해 드립니다.`,
+          filename,
+          pdfBase64,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setEmailResult({ ok: true, msg: `${to} 로 발송했습니다.` });
+      } else {
+        setEmailResult({ ok: false, msg: data.error || "발송에 실패했습니다." });
+      }
+    } catch {
+      setEmailResult({ ok: false, msg: "발송 중 오류가 발생했습니다." });
+    } finally {
+      setEmailSending(false);
+    }
+  }
 
   async function makePdfBlob(): Promise<Blob | null> {
     if (!ref.current) return null;
@@ -198,7 +253,45 @@ export default function StatementView({
         >
           🖨 인쇄
         </button>
+        <button
+          onClick={() => {
+            setShowEmailForm((v) => !v);
+            setEmailResult(null);
+          }}
+          disabled={rows.length === 0}
+          className="rounded-xl border border-stone-300 text-stone-700 font-semibold px-5 py-2.5 text-sm disabled:opacity-40"
+        >
+          📧 메일로 보내기
+        </button>
       </div>
+
+      {showEmailForm && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl p-3">
+          <input
+            type="email"
+            value={emailTo}
+            onChange={(e) => setEmailTo(e.target.value)}
+            placeholder="받는 사람 이메일"
+            className="flex-1 min-w-[200px] rounded-lg border border-stone-300 px-3 py-2 text-sm"
+          />
+          <button
+            onClick={sendEmail}
+            disabled={emailSending}
+            className="rounded-lg bg-amber-700 text-white font-semibold px-4 py-2 text-sm disabled:opacity-40"
+          >
+            {emailSending ? "보내는 중…" : "보내기"}
+          </button>
+          {emailResult && (
+            <div
+              className={`w-full text-xs ${
+                emailResult.ok ? "text-emerald-700" : "text-red-600"
+              }`}
+            >
+              {emailResult.ok ? "✅" : "⚠️"} {emailResult.msg}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 인쇄/캡처 대상 */}
       <div className="overflow-x-auto">

@@ -56,6 +56,7 @@ export default function QuickStatementForm({
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [businessNo, setBusinessNo] = useState("");
   const [address, setAddress] = useState("");
   const [bank, setBank] = useState("");
@@ -170,6 +171,13 @@ export default function QuickStatementForm({
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="연락처 (선택)"
+            className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
+          />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="이메일 (선택, 메일 발송용)"
             className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
           />
           <input
@@ -336,6 +344,7 @@ export default function QuickStatementForm({
                 business_no: businessNo.trim() || null,
                 address: address.trim() || null,
                 bank: bank.trim() || null,
+                email: email.trim() || null,
               }
             : null
         }
