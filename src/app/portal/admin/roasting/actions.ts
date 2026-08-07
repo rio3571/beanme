@@ -20,6 +20,7 @@ export async function addManualRoast(input: {
   brand?: string; // '희연재'(기본) | '푸르파파'
   accountId?: string | null; // 기존 거래처(b2b_accounts) 연결 (선택)
   cash?: boolean; // 현금 매출 여부 (희연재)
+  oem?: boolean; // OEM(가공 위탁) 여부 — 가공비 계산에서 제외 (푸르파파)
 }): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
   const admin = createAdminClient();
@@ -31,6 +32,7 @@ export async function addManualRoast(input: {
     brand: input.brand === "푸르파파" ? "푸르파파" : "희연재",
     account_id: input.accountId || null,
     cash: input.cash === true,
+    oem: input.oem === true,
   });
   revalidatePath("/portal/admin/roasting");
   revalidatePath("/portal/admin/profit");
@@ -74,6 +76,7 @@ export async function updateManualRoast(
     amount?: number;
     accountId?: string | null;
     cash?: boolean;
+    oem?: boolean;
   }
 ): Promise<{ ok: boolean }> {
   if (!(await isAdmin())) return { ok: false };
@@ -86,6 +89,7 @@ export async function updateManualRoast(
       amount: Math.max(0, Math.round(Number(input.amount) || 0)),
       account_id: input.accountId || null,
       ...(input.cash === undefined ? {} : { cash: input.cash === true }),
+      ...(input.oem === undefined ? {} : { oem: input.oem === true }),
     })
     .eq("id", id);
   revalidatePath("/portal/admin/roasting");

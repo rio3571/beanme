@@ -24,6 +24,7 @@ export type MonthAgg = {
   manualRevenue: number;
   cashRevenue: number; // 주문 중 현금(부가세 없음) 거래처 매출
   kg: Record<string, number>;
+  oemKg: number; // OEM(가공 위탁) kg — 가공비 계산에서 제외
 };
 export type PuEntry = {
   id: string;
@@ -32,6 +33,7 @@ export type PuEntry = {
   roastDate: string;
   amount: number;
   cash?: boolean; // 현금 매출(희연재 수기)
+  oem?: boolean; // OEM(가공 위탁) — 직접 로스팅 안 함
 };
 export type HyDetailRow = {
   account: string;
@@ -79,6 +81,7 @@ export default function ProfitView({
   const [puAccount, setPuAccount] = useState("");
   const [puVals, setPuVals] = useState<Record<string, string>>({});
   const [puAmount, setPuAmount] = useState("");
+  const [puOem, setPuOem] = useState(false); // OEM(가공 위탁) 행
   // 희연재 수기 총금액 편집
   const [hyAmt, setHyAmt] = useState<Record<string, string>>({});
 
@@ -113,11 +116,19 @@ export default function ProfitView({
 
   const productNames = cfg.recipes.map((r) => r.name);
 
-  // 판매단가 × kg = 자동 매출
-  const puAuto = productNames.reduce(
-    (s, p) => s + Math.round(Number(puVals[p]) || 0) * (cfg.sellPrice[p] ?? 0),
+  // 입력된 총 kg (OEM 단가 계산용)
+  const puTotalKg = productNames.reduce(
+    (s, p) => s + Math.round(Number(puVals[p]) || 0),
     0
   );
+  // 판매단가 × kg = 자동 매출(공급가).
+  // OEM은 품목 구분 없이 OEM 단가(부가세 포함) 적용 → 공급가로 환산해 저장.
+  const puAuto = puOem
+    ? Math.round((puTotalKg * (cfg.oemPrice ?? 0)) / 1.1)
+    : productNames.reduce(
+        (s, p) => s + Math.round(Number(puVals[p]) || 0) * (cfg.sellPrice[p] ?? 0),
+        0
+      );
 
   function addPu() {
     const qtys: Record<string, number> = {};
@@ -131,15 +142,18 @@ export default function ProfitView({
       : 0;
     const amt = manual || Math.round(puAuto);
     if (Object.keys(qtys).length === 0 && amt === 0) return;
+    const oem = puOem;
     setPuAccount("");
     setPuVals({});
     setPuAmount("");
+    setPuOem(false);
     addManualRoast({
       account: puAccount.trim(),
       qtys,
       roastDate: `${month}-15`,
       amount: amt,
       brand: "푸르파파",
+      oem,
     }).then(refresh);
   }
 
@@ -161,6 +175,7 @@ export default function ProfitView({
       manualRevenue: 0,
       cashRevenue: 0,
       kg: {},
+      oemKg: 0,
     };
     for (const k of periodKeys) {
       const m = src[k];
@@ -168,6 +183,7 @@ export default function ProfitView({
       out.orderRevenue += m.orderRevenue;
       out.manualRevenue += m.manualRevenue;
       out.cashRevenue += m.cashRevenue;
+      out.oemKg += m.oemKg ?? 0;
       for (const [p, v] of Object.entries(m.kg)) out.kg[p] = (out.kg[p] ?? 0) + v;
     }
     return out;
@@ -188,7 +204,9 @@ export default function ProfitView({
       0
     );
     const pkgCost = Math.round(totalKg * pkgPerKg);
-    const procCost = Math.round(totalKg * cfg.processing);
+    // OEM(가공 위탁)분은 직접 로스팅하지 않으므로 가공비 대상에서 제외
+    const oemKg = m.oemKg ?? 0;
+    const procCost = Math.round(Math.max(0, totalKg - oemKg) * cfg.processing);
     const fix = Math.round(fixedTotal(cfg) * shareRatio);
     // 실질이익 = 회사 매출(현금 제외) − 전체 원가(현금 판매분 원가 포함).
     // 부가세(내야 할 것)·현금(개인 수익)은 수익에서 제외.
@@ -200,6 +218,7 @@ export default function ProfitView({
       bizRevenue,
       vat,
       totalKg,
+      oemKg,
       beanCost,
       pkgCost,
       procCost,
@@ -219,6 +238,7 @@ export default function ProfitView({
     bizRevenue: resHY.bizRevenue + resPU.bizRevenue,
     vat: resHY.vat + resPU.vat,
     totalKg: resHY.totalKg + resPU.totalKg,
+    oemKg: resHY.oemKg + resPU.oemKg,
     beanCost: resHY.beanCost + resPU.beanCost,
     pkgCost: resHY.pkgCost + resPU.pkgCost,
     procCost: resHY.procCost + resPU.procCost,
@@ -242,6 +262,7 @@ export default function ProfitView({
     manualRevenue: mdHY.manualRevenue + mdPU.manualRevenue,
     cashRevenue: mdHY.cashRevenue + mdPU.cashRevenue,
     kg: mergedKg,
+    oemKg: mdHY.oemKg + mdPU.oemKg,
   };
 
   const share =
@@ -948,6 +969,17 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
                 />
                 <span className="text-xs text-stone-400">원</span>
               </div>
+              <label className="flex items-center gap-1.5 text-sm text-stone-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={puOem}
+                  onChange={(e) => setPuOem(e.target.checked)}
+                  className="w-4 h-4 accent-sky-600"
+                />
+                <span className={puOem ? "font-semibold text-sky-700" : ""}>
+                  OEM(가공)
+                </span>
+              </label>
               <button
                 onClick={addPu}
                 className="h-9 rounded-lg bg-amber-700 text-white text-sm font-semibold px-5 hover:bg-amber-800"
@@ -957,15 +989,32 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
             </div>
             {puAuto > 0 && (
               <div className="text-xs text-stone-500 mb-2">
-                판매단가 자동 매출 공급가 <b>{won(puAuto)}</b> · 부가세{" "}
-                {won(Math.round(puAuto * 0.1))} ·{" "}
-                <b className="text-amber-700">
-                  부가세 포함 {won(Math.round(puAuto * 1.1))}
-                </b>
-                <span className="text-stone-400">
-                  {" "}
-                  (매출칸 비우면 공급가 기준 자동 적용 · 매출 집계는 부가세 포함)
-                </span>
+                {puOem ? (
+                  <>
+                    <b className="text-sky-700">OEM 가공 위탁</b> · {puTotalKg}kg ×{" "}
+                    {won(cfg.oemPrice ?? 0)}(부가세 포함) ={" "}
+                    <b className="text-sky-700">
+                      {won(Math.round(puTotalKg * (cfg.oemPrice ?? 0)))}
+                    </b>{" "}
+                    · 공급가 {won(puAuto)}
+                    <span className="text-stone-400">
+                      {" "}
+                      (직접 로스팅 아님 → 가공비 계산에서 제외)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    판매단가 자동 매출 공급가 <b>{won(puAuto)}</b> · 부가세{" "}
+                    {won(Math.round(puAuto * 0.1))} ·{" "}
+                    <b className="text-amber-700">
+                      부가세 포함 {won(Math.round(puAuto * 1.1))}
+                    </b>
+                    <span className="text-stone-400">
+                      {" "}
+                      (매출칸 비우면 공급가 기준 자동 적용 · 매출 집계는 부가세 포함)
+                    </span>
+                  </>
+                )}
               </div>
             )}
 
@@ -974,8 +1023,13 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
                 {monthPu.map((e) => (
                   <span
                     key={e.id}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 border border-stone-200 px-2.5 py-1 text-xs text-stone-700"
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+                      e.oem
+                        ? "bg-sky-50 border-sky-200 text-sky-800"
+                        : "bg-stone-100 border-stone-200 text-stone-700"
+                    }`}
                   >
+                    {e.oem && <b className="text-sky-700">OEM</b>}
                     {e.account ? `${e.account} · ` : ""}
                     {Object.entries(e.qtys)
                       .map(([p, q]) => `${p} ${q}`)
@@ -1281,6 +1335,7 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
                     ["roastSpeed", "로스팅(kg/h)"],
                     ["packSpeed", "포장(kg/h)"],
                     ["processing", "가공비(원/kg)"],
+                    ["oemPrice", "OEM단가(원/kg·VAT포함)"],
                   ] as const
                 ).map(([k, label]) => (
                   <label key={k} className="flex items-center gap-2 text-sm">

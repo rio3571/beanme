@@ -36,7 +36,7 @@ export default async function ProfitPage() {
       .limit(2000),
     admin
       .from("roast_manual")
-      .select("id, account, qtys, roast_date, amount, brand, cash"),
+      .select("id, account, qtys, roast_date, amount, brand, cash, oem"),
     admin.from("b2b_accounts").select("id, company_name, memo"),
   ]);
 
@@ -63,9 +63,9 @@ export default async function ProfitPage() {
   const monthHY: Record<string, MonthAgg> = {};
   const monthPU: Record<string, MonthAgg> = {};
   const ensureHY = (ym: string) =>
-    (monthHY[ym] ??= { orderRevenue: 0, manualRevenue: 0, cashRevenue: 0, kg: {} });
+    (monthHY[ym] ??= { orderRevenue: 0, manualRevenue: 0, cashRevenue: 0, kg: {}, oemKg: 0 });
   const ensurePU = (ym: string) =>
-    (monthPU[ym] ??= { orderRevenue: 0, manualRevenue: 0, cashRevenue: 0, kg: {} });
+    (monthPU[ym] ??= { orderRevenue: 0, manualRevenue: 0, cashRevenue: 0, kg: {}, oemKg: 0 });
 
   // 희연재 거래처별 주문내역 (월→거래처)
   const hyDetailMap: Record<string, Map<string, HyDetailRow>> = {};
@@ -115,14 +115,18 @@ export default async function ProfitPage() {
     const amount = (r.amount as number) ?? 0;
     const isPu = ((r.brand as string) ?? "희연재") === "푸르파파";
     const isCash = r.cash === true; // 현금 매출(희연재만 · 대표님 개인 수익)
+    const isOem = r.oem === true; // OEM(가공 위탁) — 직접 로스팅 안 함 → 가공비 제외
     // 푸르파파 납품 단가는 부가세 별도 → 매출 부가세 포함. 희연재는 원래대로(입력값 그대로).
     const rev = isPu ? vatAmounts(amount, "excluded").total : amount;
     const m = isPu ? ensurePU(ym) : ensureHY(ym);
     m.manualRevenue += rev;
     if (!isPu && isCash) m.cashRevenue += rev; // 현금 = 개인 수익으로 분리
+    let rowKg = 0;
     for (const [pn, kg] of Object.entries(qtys)) {
       m.kg[pn] = (m.kg[pn] ?? 0) + (kg ?? 0);
+      rowKg += kg ?? 0;
     }
+    if (isOem) m.oemKg += rowKg;
     if (isPu) {
       puEntries.push({
         id: r.id as string,
@@ -130,6 +134,7 @@ export default async function ProfitPage() {
         qtys,
         roastDate: (r.roast_date as string) ?? "",
         amount,
+        oem: isOem,
       });
     } else {
       const acc = (r.account as string)?.trim() || "(수기)";
