@@ -17,6 +17,7 @@ import {
   removeManualRoast,
   updateManualAmount,
   setManualCash,
+  setManualOem,
 } from "../roasting/actions";
 
 export type MonthAgg = {
@@ -1029,7 +1030,17 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
                         : "bg-stone-100 border-stone-200 text-stone-700"
                     }`}
                   >
-                    {e.oem && <b className="text-sky-700">OEM</b>}
+                    <button
+                      onClick={() => setManualOem(e.id, !e.oem).then(refresh)}
+                      title={e.oem ? "OEM 해제" : "OEM(가공 위탁)으로 표시"}
+                      className={`rounded px-1 font-bold ${
+                        e.oem
+                          ? "text-sky-700 hover:text-sky-900"
+                          : "text-stone-300 hover:text-sky-600"
+                      }`}
+                    >
+                      OEM
+                    </button>
                     {e.account ? `${e.account} · ` : ""}
                     {Object.entries(e.qtys)
                       .map(([p, q]) => `${p} ${q}`)

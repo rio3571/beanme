@@ -52,6 +52,19 @@ export async function setManualCash(
   return { ok: true };
 }
 
+/** 수기 행 OEM(가공 위탁) 여부만 토글 (목록에서 클릭) */
+export async function setManualOem(
+  id: string,
+  oem: boolean
+): Promise<{ ok: boolean }> {
+  if (!(await isAdmin())) return { ok: false };
+  const admin = createAdminClient();
+  await admin.from("roast_manual").update({ oem: oem === true }).eq("id", id);
+  revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/profit");
+  return { ok: true };
+}
+
 export async function updateManualAmount(
   id: string,
   amount: number
