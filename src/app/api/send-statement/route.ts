@@ -24,8 +24,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = process.env.GMAIL_USER;
-    const pass = process.env.GMAIL_APP_PASSWORD;
+    const user = process.env.GMAIL_USER?.trim();
+    // 구글이 앱 비밀번호를 "abcd efgh ijkl mnop" 형태로 보여줘서 공백째 붙여넣는 경우가 많음
+    const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, "");
     if (!user || !pass) {
       return NextResponse.json(
         {
@@ -58,8 +59,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("메일 발송 실패:", err);
+    const raw = (err as Error)?.message ?? "";
+    const isAuthFail =
+      (err as { code?: string })?.code === "EAUTH" || raw.includes("535");
     return NextResponse.json(
-      { ok: false, error: (err as Error)?.message ?? "발송 중 오류가 발생했습니다." },
+      {
+        ok: false,
+        error: isAuthFail
+          ? "Gmail 로그인에 실패했습니다. 구글 계정 비밀번호를 바꾸면 기존 앱 비밀번호가 자동으로 해제됩니다. 앱 비밀번호를 새로 발급받아 GMAIL_APP_PASSWORD 를 교체한 뒤 재배포해 주세요."
+          : raw || "발송 중 오류가 발생했습니다.",
+      },
       { status: 500 }
     );
   }
