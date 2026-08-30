@@ -429,21 +429,6 @@ export default function StatementView({
             </div>
           )}
 
-          {/* 공급자 대표이사 서명 */}
-          <div className="flex justify-end items-center gap-2 mt-10">
-            <span className="text-sm text-stone-700">
-              {SUPPLIER.name} 대표이사 {SUPPLIER.ceo}
-            </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/signature.png"
-              alt=""
-              aria-hidden="true"
-              width={140}
-              style={{ width: 140, height: "auto" }}
-            />
-          </div>
-
           <div className="text-center text-xs text-stone-400 mt-6">
             {SUPPLIER.name} · 본 명세서는 거래 참고용입니다.
           </div>
