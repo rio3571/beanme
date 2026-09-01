@@ -410,32 +410,74 @@ export default function StatementView({
           <div className="flex justify-end mt-4">
             <table className="text-sm">
               <tbody>
-                <tr>
-                  <td className="px-3 py-1 text-stone-500">공급가액</td>
-                  <td className="px-3 py-1 text-right font-medium w-36">
-                    {won(supply)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-1 text-stone-500">
-                    {vatRowLabel}
-                  </td>
-                  <td className="px-3 py-1 text-right font-medium">{won(vat)}</td>
-                </tr>
-                <tr className="border-t-2 border-stone-800">
-                  <td className="px-3 py-1.5 font-bold">합계금액</td>
-                  <td className="px-3 py-1.5 text-right font-bold text-base">
-                    {won(grand)}
-                  </td>
-                </tr>
+                {vatMode === "excluded" ? (
+                  <>
+                    <tr>
+                      <td className="px-3 py-1 text-stone-500">공급가액</td>
+                      <td className="px-3 py-1 text-right font-medium w-36">
+                        {won(supply)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-1 text-stone-500">부가세 (10%)</td>
+                      <td className="px-3 py-1 text-right font-medium">{won(vat)}</td>
+                    </tr>
+                    <tr className="border-t-2 border-stone-800">
+                      <td className="px-3 py-1.5 font-bold">합계금액</td>
+                      <td className="px-3 py-1.5 text-right font-bold text-base">
+                        {won(grand)}
+                      </td>
+                    </tr>
+                  </>
+                ) : (
+                  <>
+                    <tr className="border-b border-stone-300">
+                      <td className="px-3 py-1.5 font-bold">
+                        합계금액
+                        <span className="ml-1 font-normal text-stone-500 text-xs">
+                          {vatMode === "cash" ? "(현금)" : "(부가세 포함)"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 text-right font-bold text-base w-36">
+                        {won(grand)}
+                      </td>
+                    </tr>
+                    {vatMode === "included" ? (
+                      <>
+                        <tr>
+                          <td className="px-3 pt-1.5 pb-0.5 pl-6 text-stone-400 text-xs">
+                            └ 공급가액
+                          </td>
+                          <td className="px-3 pt-1.5 pb-0.5 text-right text-stone-400 text-xs">
+                            {won(supply)}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 pt-0.5 pb-1.5 pl-6 text-stone-400 text-xs">
+                            └ 부가세
+                          </td>
+                          <td className="px-3 pt-0.5 pb-1.5 text-right text-stone-400 text-xs">
+                            {won(vat)}
+                          </td>
+                        </tr>
+                      </>
+                    ) : (
+                      <tr>
+                        <td className="px-3 py-1.5 pl-6 text-stone-400 text-xs" colSpan={2}>
+                          부가세 없음 (현금 거래)
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                )}
               </tbody>
             </table>
           </div>
 
           {vatMode === "included" && (
             <div className="text-right text-xs text-stone-500 mt-1">
-              ※ 위 단가와 금액은 부가세가 포함된 금액입니다. 합계금액에 부가세가 추가로
-              더해지지 않습니다.
+              ※ 단가와 금액에 부가세가 이미 포함되어 있습니다. 합계금액이 최종 청구액이며,
+              여기에 부가세가 더 붙지 않습니다.
             </div>
           )}
 
