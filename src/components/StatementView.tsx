@@ -54,6 +54,16 @@ export default function StatementView({
 
   const { supply, vat, total: grand } = vatAmounts(total, vatMode);
 
+  // 부가세 모드에 따라 표의 열 이름이 달라져야 한다.
+  // 포함/현금 모드에서 입력 단가는 이미 최종가라, 그 열을 '공급가액'이라 부르면
+  // 아래 요약의 공급가액(÷1.1)과 뜻이 어긋나 부가세가 또 붙는 것처럼 읽힌다.
+  const unitLabel = vatMode === "included" ? "단가 (VAT 포함)" : "단가";
+  const amountLabel = vatMode === "excluded" ? "공급가액" : "금액";
+  const vatRowLabel =
+    vatMode === "cash" ? "부가세 (현금·면세)"
+    : vatMode === "included" ? "부가세 (10%, 위 금액에 포함)"
+    : "부가세 (10%)";
+
   const filename = `거래내역서_${buyer?.company_name ?? ""}_${monthYm}.pdf`;
 
   async function blobToBase64(blob: Blob): Promise<string> {
@@ -353,10 +363,10 @@ export default function StatementView({
                   수량
                 </th>
                 <th className="border border-stone-300 px-2 py-1.5 text-right">
-                  단가
+                  {unitLabel}
                 </th>
                 <th className="border border-stone-300 px-2 py-1.5 text-right">
-                  공급가액
+                  {amountLabel}
                 </th>
               </tr>
             </thead>
@@ -408,7 +418,7 @@ export default function StatementView({
                 </tr>
                 <tr>
                   <td className="px-3 py-1 text-stone-500">
-                    {vatMode === "cash" ? "부가세 (현금·면세)" : "부가세 (10%)"}
+                    {vatRowLabel}
                   </td>
                   <td className="px-3 py-1 text-right font-medium">{won(vat)}</td>
                 </tr>
@@ -421,6 +431,13 @@ export default function StatementView({
               </tbody>
             </table>
           </div>
+
+          {vatMode === "included" && (
+            <div className="text-right text-xs text-stone-500 mt-1">
+              ※ 위 단가와 금액은 부가세가 포함된 금액입니다. 합계금액에 부가세가 추가로
+              더해지지 않습니다.
+            </div>
+          )}
 
           {buyer?.bank && (
             <div className="mt-5 border border-stone-300 rounded-lg p-3 text-sm">
