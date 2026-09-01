@@ -443,24 +443,14 @@ export default function StatementView({
                       </td>
                     </tr>
                     {vatMode === "included" ? (
-                      <>
-                        <tr>
-                          <td className="px-3 pt-1.5 pb-0.5 pl-6 text-stone-400 text-xs">
-                            └ 공급가액
-                          </td>
-                          <td className="px-3 pt-1.5 pb-0.5 text-right text-stone-400 text-xs">
-                            {won(supply)}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-3 pt-0.5 pb-1.5 pl-6 text-stone-400 text-xs">
-                            └ 부가세
-                          </td>
-                          <td className="px-3 pt-0.5 pb-1.5 text-right text-stone-400 text-xs">
-                            {won(vat)}
-                          </td>
-                        </tr>
-                      </>
+                      <tr>
+                        <td
+                          className="px-3 py-1.5 text-right text-stone-400 text-xs"
+                          colSpan={2}
+                        >
+                          이 중 부가세 {won(vat)} (공급가액 {won(supply)})
+                        </td>
+                      </tr>
                     ) : (
                       <tr>
                         <td className="px-3 py-1.5 pl-6 text-stone-400 text-xs" colSpan={2}>
@@ -476,8 +466,8 @@ export default function StatementView({
 
           {vatMode === "included" && (
             <div className="text-right text-xs text-stone-500 mt-1">
-              ※ 단가와 금액에 부가세가 이미 포함되어 있습니다. 합계금액이 최종 청구액이며,
-              여기에 부가세가 더 붙지 않습니다.
+              ※ 모든 단가와 금액에 부가세가 이미 포함된 금액입니다.
+              합계금액 {won(grand)}이 최종 청구액이며, 여기에 부가세가 더 붙지 않습니다.
             </div>
           )}
 
