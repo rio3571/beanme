@@ -10,6 +10,11 @@ import type { CommentRow } from "@/app/portal/comments";
 import { parseMeta } from "@/lib/acctMeta";
 import { carrySummary, type CarryItem } from "@/lib/carry";
 import AutoRefresh from "@/components/AutoRefresh";
+import { DEFAULT_VAT } from "@/lib/vat";
+import AdminOrderForm, {
+  type AdminOrderAccount,
+  type AdminOrderProduct,
+} from "./AdminOrderForm";
 
 export const dynamic = "force-dynamic";
 
@@ -37,16 +42,52 @@ export default async function AdminOrdersPage() {
   if (me.role !== "admin") redirect("/portal/order");
 
   const admin = createAdminClient();
-  // orders + accounts 동시 실행
-  const [{ data: orderData }, { data: acctData }] = await Promise.all([
+  // orders + accounts + 대리주문용 상품/단가 동시 실행
+  const [
+    { data: orderData },
+    { data: acctData },
+    { data: prodData },
+    { data: priceData },
+  ] = await Promise.all([
     admin
       .from("b2b_orders")
       .select("id, order_no, account_id, status, total_amount, note, created_at, unit")
       .order("created_at", { ascending: false })
       .limit(200),
-    admin.from("b2b_accounts").select("id, company_name, memo"),
+    admin
+      .from("b2b_accounts")
+      .select("id, company_name, memo, role, active, auth_user_id"),
+    admin
+      .from("products")
+      .select("id, name, unit, base_price, owner_account_id")
+      .eq("active", true)
+      .order("sort_order"),
+    admin.from("account_prices").select("account_id, product_id, unit_price"),
   ]);
   const orders = (orderData ?? []) as OrderRow[];
+
+  // ── 대리 주문 폼에 넘길 데이터 ──
+  const formAccounts: AdminOrderAccount[] = (acctData ?? [])
+    .filter((a) => a.role === "buyer" && a.active !== false)
+    .map((a) => {
+      const meta = parseMeta(a.memo as string | null);
+      return {
+        id: a.id as string,
+        name: a.company_name as string,
+        vat: meta.vat ?? DEFAULT_VAT,
+        units: meta.units ?? [],
+        hasLogin: Boolean(a.auth_user_id),
+      };
+    })
+    .sort((x, y) => x.name.localeCompare(y.name, "ko"));
+
+  const formProducts = (prodData ?? []) as AdminOrderProduct[];
+
+  const formPrices: Record<string, Record<string, number>> = {};
+  for (const p of priceData ?? []) {
+    const acc = p.account_id as string;
+    (formPrices[acc] ??= {})[p.product_id as string] = p.unit_price as number;
+  }
 
   const nameMap = new Map(
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])
@@ -165,6 +206,13 @@ export default async function AdminOrdersPage() {
         <h1 className="text-lg font-bold text-stone-800">전체 주문</h1>
         <AutoRefresh seconds={20} />
       </div>
+
+      <AdminOrderForm
+        accounts={formAccounts}
+        products={formProducts}
+        prices={formPrices}
+      />
+
       {orders.length === 0 ? (
         <p className="text-stone-400 text-center py-16">아직 주문이 없어요.</p>
       ) : (

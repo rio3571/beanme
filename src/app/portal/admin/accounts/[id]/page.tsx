@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -32,6 +33,7 @@ type AccountRow = {
   business_no: string | null;
   address: string | null;
   memo: string | null;
+  auth_user_id: string | null;
 };
 
 export default async function AccountPricePage({
@@ -107,24 +109,41 @@ export default async function AccountPricePage({
         <NameForm accountId={account.id} initial={account.company_name} />
       </div>
 
-      <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
-        <div className="font-semibold text-stone-800 mb-2">로그인 정보</div>
-        <div className="text-sm space-y-1">
-          <div className="flex gap-2">
-            <span className="text-stone-400 w-16">아이디</span>
-            <span className="font-medium text-stone-800 select-all">
-              {displayLoginId(account.email)}
-            </span>
+      {account.auth_user_id ? (
+        <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
+          <div className="font-semibold text-stone-800 mb-2">로그인 정보</div>
+          <div className="text-sm space-y-1">
+            <div className="flex gap-2">
+              <span className="text-stone-400 w-16">아이디</span>
+              <span className="font-medium text-stone-800 select-all">
+                {displayLoginId(account.email)}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-stone-400 w-16">비밀번호</span>
+              <span className="font-medium text-stone-800 select-all">
+                {meta.pw ? meta.pw : "(확인 불가 — 아래에서 재설정하세요)"}
+              </span>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <span className="text-stone-400 w-16">비밀번호</span>
-            <span className="font-medium text-stone-800 select-all">
-              {meta.pw ? meta.pw : "(확인 불가 — 아래에서 재설정하세요)"}
-            </span>
-          </div>
+          <PasswordResetForm accountId={account.id} />
         </div>
-        <PasswordResetForm accountId={account.id} />
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
+          <div className="font-semibold text-stone-800 mb-1">포털 아이디 없음</div>
+          <p className="text-sm text-stone-500">
+            전화·카톡으로 주문받는 거래처입니다. 주문은{" "}
+            <Link
+              href="/portal/admin/orders"
+              className="font-semibold text-amber-700 underline"
+            >
+              전체 주문
+            </Link>{" "}
+            화면의 <b>＋ 거래처 대신 주문 넣기</b>로 등록하세요. 단가·거래명세서·로스팅
+            목록은 아이디 있는 거래처와 똑같이 동작합니다.
+          </p>
+        </div>
+      )}
 
       <VatForm accountId={account.id} initial={meta.vat} />
       <TaxInfoForm

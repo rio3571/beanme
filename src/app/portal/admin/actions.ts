@@ -137,9 +137,34 @@ export async function createAccount(
   const phone = String(formData.get("phone") || "").trim();
   const business = String(formData.get("business") || "").trim();
   const address = String(formData.get("address") || "").trim();
+  // 포털 로그인 없이 등록 — 전화·카톡으로 주문받고 대표가 대신 넣는 거래처
+  const noLogin = String(formData.get("noLogin") || "") === "on";
 
-  if (!loginId || !password || !company) {
-    return { error: "아이디·비밀번호·상호는 필수입니다." };
+  if (!company) return { error: "상호는 필수입니다." };
+
+  const admin = createAdminClient();
+
+  if (noLogin) {
+    const { error: insErr } = await admin.from("b2b_accounts").insert({
+      auth_user_id: null,
+      company_name: company,
+      contact_name: contact || null,
+      phone: phone || null,
+      email: null,
+      business_no: business || null,
+      address: address || null,
+      role: "buyer",
+      active: true,
+      memo: null,
+    });
+    if (insErr) return { error: "거래처 저장 실패: " + insErr.message };
+    revalidatePath("/portal/admin/accounts");
+    revalidatePath("/portal/admin/orders");
+    return { error: null, ok: true };
+  }
+
+  if (!loginId || !password) {
+    return { error: "아이디·비밀번호는 필수입니다." };
   }
   if (!validLoginId(loginId)) {
     return { error: "아이디는 영문/숫자(. _ - 가능) 또는 이메일 형식이어야 해요." };
@@ -148,7 +173,6 @@ export async function createAccount(
 
   const email = toAuthEmail(loginId);
 
-  const admin = createAdminClient();
   const { data: created, error } = await admin.auth.admin.createUser({
     email,
     password,
@@ -176,6 +200,7 @@ export async function createAccount(
   }
 
   revalidatePath("/portal/admin/accounts");
+  revalidatePath("/portal/admin/orders");
   return { error: null, ok: true };
 }
 

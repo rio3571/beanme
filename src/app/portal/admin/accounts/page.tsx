@@ -12,6 +12,7 @@ type AccountRow = {
   contact_name: string | null;
   phone: string | null;
   active: boolean;
+  auth_user_id: string | null;
 };
 
 export default async function AdminAccountsPage() {
@@ -22,7 +23,7 @@ export default async function AdminAccountsPage() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("b2b_accounts")
-    .select("id, company_name, contact_name, phone, active")
+    .select("id, company_name, contact_name, phone, active, auth_user_id")
     .eq("role", "buyer")
     .order("created_at", { ascending: false });
   const accounts = (data ?? []) as AccountRow[];
@@ -46,6 +47,11 @@ export default async function AdminAccountsPage() {
             <div className="flex items-center justify-between">
               <span className="font-semibold text-stone-800">
                 {a.company_name}
+                {!a.auth_user_id && (
+                  <span className="ml-1.5 align-middle text-[11px] font-bold text-stone-500 bg-stone-100 border border-stone-200 rounded px-1.5 py-0.5">
+                    아이디 없음
+                  </span>
+                )}
               </span>
               <span className="text-xs text-amber-700">관리 ›</span>
             </div>

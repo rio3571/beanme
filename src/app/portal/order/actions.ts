@@ -17,6 +17,12 @@ type ProductRow = {
   base_price: number;
 };
 
+type OrderAccount = {
+  id: string;
+  company_name: string;
+  memo: string | null;
+};
+
 export async function createOrder(input: {
   items: { id: string; qty: number }[];
   note: string;
@@ -26,7 +32,37 @@ export async function createOrder(input: {
   if (!account || account.role === "admin") {
     return { ok: false, error: "권한이 없습니다." };
   }
+  return placeOrder(account, input, false);
+}
 
+/** 관리자가 거래처를 골라 대신 넣는 주문.
+ *  포털 아이디가 없는 거래처(전화·카톡으로 받는 곳)도 정식 주문으로 기록되어
+ *  로스팅 목록·거래명세서·수익관리에 그대로 반영된다. */
+export async function createOrderForAccount(input: {
+  accountId: string;
+  items: { id: string; qty: number }[];
+  note: string;
+  unit?: string;
+}): Promise<OrderResult> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("b2b_accounts")
+    .select("id, company_name, memo")
+    .eq("id", input.accountId)
+    .maybeSingle();
+  if (!data) return { ok: false, error: "거래처를 찾을 수 없어요." };
+
+  return placeOrder(data as OrderAccount, input, true);
+}
+
+async function placeOrder(
+  account: OrderAccount,
+  input: { items: { id: string; qty: number }[]; note: string; unit?: string },
+  byAdmin: boolean
+): Promise<OrderResult> {
   const wanted = (input.items ?? []).filter((i) => i && i.qty > 0);
   if (wanted.length === 0) {
     return { ok: false, error: "수량을 1개 이상 입력하세요." };
@@ -111,14 +147,21 @@ export async function createOrder(input: {
     return { ok: false, error: "주문 품목 저장에 실패했습니다." };
   }
 
-  const lineText = lines
-    .map((l) => `· ${l.product_name} ${l.qty}${l.unit} = ${won(l.line_amount)}`)
-    .join("\n");
-  await notifyOwner(
-    `[새 주문] ${account.company_name}${unit ? ` · ${unit}` : ""}\n주문번호 ${order_no}\n${lineText}\n합계 ${won(
-      total
-    )}${input.note?.trim() ? `\n요청: ${input.note.trim()}` : ""}`
-  );
+  // 대리 등록은 대표가 직접 넣은 것이라 알림을 보내지 않는다(본인에게 울림).
+  if (!byAdmin) {
+    const lineText = lines
+      .map((l) => `· ${l.product_name} ${l.qty}${l.unit} = ${won(l.line_amount)}`)
+      .join("\n");
+    await notifyOwner(
+      `[새 주문] ${account.company_name}${unit ? ` · ${unit}` : ""}\n주문번호 ${order_no}\n${lineText}\n합계 ${won(
+        total
+      )}${input.note?.trim() ? `\n요청: ${input.note.trim()}` : ""}`
+    );
+  } else {
+    revalidatePath("/portal/admin/orders");
+    revalidatePath("/portal/admin/roasting");
+    revalidatePath("/portal/admin");
+  }
 
   return { ok: true, orderNo: order_no };
 }
