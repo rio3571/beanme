@@ -256,3 +256,14 @@ data/
 - ⏳ `supabase_bank_info.sql` (입금계좌 컬럼) **사용자 Run 대기** — 실행 전엔 계좌 기능 비활성(코드는 안 깨짐).
 - 3단계: **전자세금계산서 자동발행**(팝빌 등 연동) — 거래명세서는 완료, 세금계산서는 추후.
 - (선택) 부가세 매출에 세금포함(×1.1) 금액 병기 / 이월 '보냈어요-비우기' 버튼 / 수기 날짜별 자동비우기.
+
+### 2026-09-02 관리자 대리 주문 + 아이디 없는 거래처
+
+**배경**: 전화·카톡으로 주문받는 거래처가 있어서 "아이디 부여 말고 내가 직접 선택해서 주문 넣게" 요청.
+
+- **`createOrderForAccount(accountId, items, note, unit)`** (`order/actions.ts`) — 관리자 전용 대리 주문. 기존 `createOrder`와 내부 `placeOrder(account, input, byAdmin)`로 로직 공유 → 단가·이월·층 검증이 거래처 주문과 동일. **byAdmin이면 텔레그램 알림 생략**(대표 본인에게 울림) + admin 경로 revalidate.
+- **`admin/orders/AdminOrderForm.tsx`** — `/portal/admin/orders` 최상단 접이식. 거래처 select → 그 거래처의 `account_prices` 단가 / `meta.vat` 부가세모드 / `meta.units` 층 / `owner_account_id` 전용품목이 자동 반영. page.tsx에서 products·account_prices를 Promise.all에 추가해 통째로 내려줌(선택 시 추가 왕복 없음).
+- **`createAccount`에 `noLogin` 분기** — 체크 시 `auth.admin.createUser` 없이 `b2b_accounts`만 insert(`auth_user_id: null`, email null, memo null). 상호만 필수. `AccountCreateForm`에 체크박스, 체크하면 아이디/비번 입력칸 숨김.
+- 거래처 목록에 `아이디 없음` 뱃지, 상세 페이지는 로그인 정보 카드 대신 안내 카드(대리주문 링크). `AccountRow`에 `auth_user_id` 추가.
+- ⚠️ **정식 `b2b_orders`로 저장** → 로스팅 목록·거래명세서·세금계산서·수익관리에 전부 자동 반영. (수기 `roast_manual`은 로스팅·수익만 반영되는 것과 다름)
+- 제안했으나 미구현: 거래처 선택 시 **지난 주문 수량 자동 채우기**(고정 주문이 많다고 함) — 사용자 답변 대기.
