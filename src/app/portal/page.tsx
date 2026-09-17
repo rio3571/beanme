@@ -4,6 +4,8 @@ import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { won, kst, ym, ymLabel, STATUS_LABEL } from "@/lib/format";
 import { parseMeta } from "@/lib/acctMeta";
+import { getNotice } from "@/lib/notice";
+import NoticeBanner from "@/components/NoticeBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ export default async function PortalHome() {
 
   const admin = createAdminClient();
   const thisYm = ym(new Date().toISOString());
+  const notice = await getNotice();
 
   const { data: orderData } = await admin
     .from("b2b_orders")
@@ -68,6 +71,8 @@ export default async function PortalHome() {
 
   return (
     <div>
+      <NoticeBanner notice={notice} />
+
       <div className="flex items-baseline justify-between mb-4">
         <h1 className="text-lg font-bold text-stone-800">
           {account.company_name}

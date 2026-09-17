@@ -6,6 +6,8 @@ import { won, ym, ymLabel } from "@/lib/format";
 import { parseMeta } from "@/lib/acctMeta";
 import { DEFAULT_VAT } from "@/lib/vat";
 import AutoRefresh from "@/components/AutoRefresh";
+import NoticeForm from "./NoticeForm";
+import { getNotice } from "@/lib/notice";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,7 @@ export default async function AdminDashboard() {
 
   const admin = createAdminClient();
   const thisYm = ym(new Date().toISOString());
+  const notice = await getNotice();
 
   // 서로 독립된 쿼리 4개는 동시에 실행 (순차 → 병렬)
   const [
@@ -110,6 +113,8 @@ export default async function AdminDashboard() {
           <AutoRefresh seconds={30} />
         </div>
       </div>
+
+      <NoticeForm initial={notice} />
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 mb-3">
         {metric("이번 달 주문", `${monthCount}건`, undefined, "bg-amber-50 border-amber-100")}

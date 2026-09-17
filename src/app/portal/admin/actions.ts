@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { toAuthEmail, validLoginId } from "@/lib/loginId";
 import { parseMeta, stringifyMeta } from "@/lib/acctMeta";
 import { revalidatePath } from "next/cache";
+import { NOTICE_ROW_ID } from "@/lib/notice";
 
 export type CreateAccountState = { error: string | null; ok?: boolean };
 
@@ -573,5 +574,36 @@ export async function updateOrdersStatus(
   await notifyStatusToBuyers(admin, before ?? [], status);
   revalidatePath("/portal/admin/roasting");
   revalidatePath("/portal/admin/orders");
+  return { ok: true };
+}
+
+// ── 포털 공지 (거래처 홈·주문화면 상단 배너) ──
+export async function saveNotice(
+  input: { on: boolean; title: string; body: string; tone: string }
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+
+  const tone =
+    input.tone === "warn" || input.tone === "info" ? input.tone : "holiday";
+  const notice = {
+    on: input.on === true,
+    title: String(input.title ?? "").trim().slice(0, 120),
+    body: String(input.body ?? "").trim().slice(0, 1000),
+    tone,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("roast_config").upsert({
+    id: NOTICE_ROW_ID,
+    data: notice,
+    updated_at: notice.updatedAt,
+  });
+  if (error) return { ok: false, error: "공지 저장 실패: " + error.message };
+
+  revalidatePath("/portal");
+  revalidatePath("/portal/order");
+  revalidatePath("/portal/admin");
   return { ok: true };
 }

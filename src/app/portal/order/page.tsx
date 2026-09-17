@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { parseMeta } from "@/lib/acctMeta";
 import { DEFAULT_VAT } from "@/lib/vat";
 import { carrySummary } from "@/lib/carry";
+import { getNotice } from "@/lib/notice";
+import NoticeBanner from "@/components/NoticeBanner";
 import OrderForm, { type OrderItem } from "./OrderForm";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +23,7 @@ export default async function OrderPage() {
   if (!account) redirect("/portal/login");
   if (account.role === "admin") redirect("/portal/admin");
 
+  const notice = await getNotice();
   const admin = createAdminClient();
   const { data: prodData } = await admin
     .from("products")
@@ -51,6 +54,8 @@ export default async function OrderPage() {
 
   return (
     <>
+      <NoticeBanner notice={notice} />
+
       {carry.length > 0 && (
         <div className="bg-rose-50 border border-rose-300 rounded-xl px-4 py-3 mb-4">
           <div className="text-sm font-bold text-rose-700">
