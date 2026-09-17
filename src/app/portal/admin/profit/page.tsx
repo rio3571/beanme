@@ -26,6 +26,8 @@ export default async function ProfitPage() {
     { data: orderRows },
     { data: manualRows },
     { data: acctRows },
+    { data: priceRows },
+    { data: prodRows },
   ] = await Promise.all([
     admin.from("roast_config").select("data").eq("id", 1).maybeSingle(),
     admin
@@ -36,8 +38,10 @@ export default async function ProfitPage() {
       .limit(2000),
     admin
       .from("roast_manual")
-      .select("id, account, qtys, roast_date, amount, brand, cash, oem"),
+      .select("id, account, qtys, roast_date, amount, brand, cash, oem, account_id"),
     admin.from("b2b_accounts").select("id, company_name, memo"),
+    admin.from("account_prices").select("account_id, product_id, unit_price"),
+    admin.from("products").select("id, name, base_price").eq("active", true),
   ]);
 
   const config = mergeConfig(cfgRow?.data);
@@ -59,6 +63,37 @@ export default async function ProfitPage() {
     ])
   );
   const orderIds = [...orderDate.keys()];
+
+  // 거래처별 { 품목명: 단가 } — 금액이 비어 있는 수기 행을 단가로 환산해 표시한다.
+  const prodNameById = new Map(
+    (prodRows ?? []).map((p) => [p.id as string, p.name as string])
+  );
+  const basePriceByName: Record<string, number> = {};
+  for (const p of prodRows ?? []) {
+    const bp = (p.base_price as number) ?? 0;
+    if (bp > 0) basePriceByName[p.name as string] = bp;
+  }
+  const priceByAccount: Record<string, Record<string, number>> = {};
+  for (const r of priceRows ?? []) {
+    const name = prodNameById.get(r.product_id as string);
+    if (!name) continue;
+    (priceByAccount[r.account_id as string] ??= {})[name] = r.unit_price as number;
+  }
+  /** 저장된 금액이 0이면 거래처 단가 × 수량으로 계산. 단가도 없으면 0. */
+  const manualAmount = (
+    stored: number,
+    accountId: string | null,
+    qtys: Record<string, number>
+  ): number => {
+    if (stored > 0) return stored;
+    if (!accountId) return 0;
+    const pm = { ...basePriceByName, ...(priceByAccount[accountId] ?? {}) };
+    let sum = 0;
+    for (const [pn, kg] of Object.entries(qtys ?? {})) {
+      sum += (pm[pn] ?? 0) * (Number(kg) || 0);
+    }
+    return Math.round(sum);
+  };
 
   const monthHY: Record<string, MonthAgg> = {};
   const monthPU: Record<string, MonthAgg> = {};
@@ -112,7 +147,11 @@ export default async function ProfitPage() {
     const ym = ((r.roast_date as string) ?? "").slice(0, 7);
     if (!ym) continue;
     const qtys = (r.qtys as Record<string, number>) ?? {};
-    const amount = (r.amount as number) ?? 0;
+    const amount = manualAmount(
+      (r.amount as number) ?? 0,
+      (r.account_id as string) ?? null,
+      qtys
+    );
     const isPu = ((r.brand as string) ?? "희연재") === "푸르파파";
     const isCash = r.cash === true; // 현금 매출(희연재만 · 대표님 개인 수익)
     const isOem = r.oem === true; // OEM(가공 위탁) — 직접 로스팅 안 함 → 가공비 제외
