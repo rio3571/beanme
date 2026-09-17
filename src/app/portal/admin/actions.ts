@@ -607,3 +607,49 @@ export async function saveNotice(
   revalidatePath("/portal/admin");
   return { ok: true };
 }
+
+/** 이 거래처 주문화면에서 숨길 공용 품목 지정.
+ *  전용 블렌드만 쓰는 거래처가 산·바다·노을을 안 보게 하려는 용도.
+ *  숨긴 뒤 주문할 품목이 하나도 남지 않으면 거부한다. */
+export async function setAccountHiddenProducts(
+  accountId: string,
+  hiddenIds: string[]
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+
+  const admin = createAdminClient();
+  const hidden = [...new Set((hiddenIds ?? []).map((s) => String(s).trim()).filter(Boolean))];
+
+  // 공용 + 이 거래처 전용 품목 중, 숨긴 것을 뺀 나머지가 있어야 주문이 가능하다
+  const { data: prods } = await admin
+    .from("products")
+    .select("id")
+    .eq("active", true)
+    .or(`owner_account_id.is.null,owner_account_id.eq.${accountId}`);
+  const left = (prods ?? []).filter((p) => !hidden.includes(p.id as string));
+  if (left.length === 0) {
+    return {
+      ok: false,
+      error: "품목을 전부 숨기면 주문을 넣을 수 없어요. 하나는 남겨두세요.",
+    };
+  }
+
+  const { data } = await admin
+    .from("b2b_accounts")
+    .select("memo")
+    .eq("id", accountId)
+    .maybeSingle();
+  const meta = parseMeta((data?.memo as string) ?? null);
+  meta.hidden = hidden;
+  const { error } = await admin
+    .from("b2b_accounts")
+    .update({ memo: stringifyMeta(meta) })
+    .eq("id", accountId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  revalidatePath("/portal/admin/orders");
+  revalidatePath("/portal/order");
+  return { ok: true };
+}

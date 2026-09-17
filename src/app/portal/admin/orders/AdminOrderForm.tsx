@@ -17,6 +17,7 @@ export type AdminOrderAccount = {
   name: string;
   vat: VatMode;
   units: string[];
+  hidden: string[]; // 이 거래처에서 숨긴 공용 품목 id
   hasLogin: boolean;
 };
 
@@ -54,8 +55,10 @@ export default function AdminOrderForm({
   const items = useMemo(() => {
     if (!account) return [];
     const pm = prices[account.id] ?? {};
+    const hidden = new Set(account.hidden ?? []);
     return products
       .filter((p) => !p.owner_account_id || p.owner_account_id === account.id)
+      .filter((p) => !hidden.has(p.id))
       .map((p) => ({
         id: p.id,
         name: p.name,

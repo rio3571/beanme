@@ -41,7 +41,11 @@ export default async function OrderPage() {
     (priceData ?? []).map((p) => [p.product_id as string, p.unit_price as number])
   );
 
-  const items: OrderItem[] = products.map((p) => ({
+  // 관리자가 이 거래처에서 숨긴 공용 품목은 제외 (전용 블렌드만 쓰는 곳)
+  const hiddenIds = new Set(parseMeta(account.memo).hidden ?? []);
+  const items: OrderItem[] = products
+    .filter((p) => !hiddenIds.has(p.id))
+    .map((p) => ({
     id: p.id,
     name: p.name,
     unit: p.unit,

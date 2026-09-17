@@ -76,6 +76,7 @@ export default async function AdminOrdersPage() {
         name: a.company_name as string,
         vat: meta.vat ?? DEFAULT_VAT,
         units: meta.units ?? [],
+        hidden: meta.hidden ?? [],
         hasLogin: Boolean(a.auth_user_id),
       };
     })

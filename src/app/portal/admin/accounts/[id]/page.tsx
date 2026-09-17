@@ -11,6 +11,7 @@ import CarryForm from "./CarryForm";
 import NameForm from "./NameForm";
 import TaxInfoForm from "./TaxInfoForm";
 import CustomProductForm from "./CustomProductForm";
+import VisibilityForm from "./VisibilityForm";
 import UnitsForm from "./UnitsForm";
 import PasswordResetForm from "./PasswordResetForm";
 import { DEFAULT_VAT } from "@/lib/vat";
@@ -177,6 +178,12 @@ export default async function AccountPricePage({
         billDay={meta.billDay}
       />
       <CustomProductForm accountId={account.id} items={customProducts} />
+      <VisibilityForm
+        accountId={account.id}
+        products={products.map((p) => ({ id: p.id, name: p.name }))}
+        initialHidden={meta.hidden ?? []}
+        hasCustom={customProducts.length > 0}
+      />
       <PriceForm accountId={account.id} rows={rows} />
     </div>
   );

@@ -53,14 +53,6 @@ export default async function EditOrderPage({
     (priceData ?? []).map((p) => [p.product_id as string, p.unit_price as number])
   );
 
-  const items: OrderItem[] = products.map((p) => ({
-    id: p.id,
-    name: p.name,
-    unit: p.unit,
-    category: p.category,
-    price: priceMap.get(p.id) ?? p.base_price,
-  }));
-
   const { data: itemData } = await admin
     .from("b2b_order_items")
     .select("product_id, qty")
@@ -70,6 +62,18 @@ export default async function EditOrderPage({
     if (it.product_id)
       initialQty[it.product_id as string] = it.qty as number;
   }
+
+  // 숨긴 공용 품목은 제외. 단, 이미 이 주문에 들어간 품목은 수정할 수 있게 남긴다.
+  const hiddenIds = new Set(parseMeta(account.memo).hidden ?? []);
+  const items: OrderItem[] = products
+    .filter((p) => !hiddenIds.has(p.id) || (initialQty[p.id] ?? 0) > 0)
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      unit: p.unit,
+      category: p.category,
+      price: priceMap.get(p.id) ?? p.base_price,
+    }));
 
   return (
     <div>
