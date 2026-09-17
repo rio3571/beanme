@@ -47,6 +47,8 @@ export default async function RoastingPage() {
     { data: acctData },
     { data: prodData },
     { data: manualData },
+    { data: priceData },
+    { data: allProdData },
     { data: monthOrderData },
   ] = await Promise.all([
     admin
@@ -63,6 +65,11 @@ export default async function RoastingPage() {
       .is("owner_account_id", null)
       .order("sort_order"),
     admin.from("roast_manual").select("*"),
+    admin.from("account_prices").select("account_id, product_id, unit_price"),
+    admin
+      .from("products")
+      .select("id, name, base_price")
+      .eq("active", true),
     admin
       .from("b2b_orders")
       .select("id, created_at")
@@ -90,9 +97,31 @@ export default async function RoastingPage() {
   const nameMap = new Map(
     (acctData ?? []).map((a) => [a.id as string, a.company_name as string])
   );
+  // 품목id → 품목명 (전용품목 포함)
+  const prodNameById = new Map(
+    (allProdData ?? []).map((p) => [p.id as string, p.name as string])
+  );
+  // 거래처별 { 품목명: 단가 } — 수기 금액 자동계산용
+  const priceByAccount: Record<string, Record<string, number>> = {};
+  for (const r of priceData ?? []) {
+    const name = prodNameById.get(r.product_id as string);
+    if (!name) continue;
+    (priceByAccount[r.account_id as string] ??= {})[name] = r.unit_price as number;
+  }
+  // 거래처 단가가 없을 때 쓸 기본가 (0이면 미설정)
+  const basePriceByName: Record<string, number> = {};
+  for (const p of allProdData ?? []) {
+    const bp = (p.base_price as number) ?? 0;
+    if (bp > 0) basePriceByName[p.name as string] = bp;
+  }
+
   // 수기 입력창에서 고를 기존 거래처 목록 (가나다순)
   const accounts = (acctData ?? [])
-    .map((a) => ({ id: a.id as string, name: a.company_name as string }))
+    .map((a) => ({
+      id: a.id as string,
+      name: a.company_name as string,
+      prices: { ...basePriceByName, ...(priceByAccount[a.id as string] ?? {}) },
+    }))
     .filter((a) => a.name)
     .sort((x, y) => x.name.localeCompare(y.name, "ko"));
   const columns: string[] = (prodData ?? []).map((p) => p.name as string);

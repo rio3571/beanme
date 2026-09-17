@@ -11,6 +11,8 @@ import {
   setManualCash,
   clearManualMonth,
   migrateManualRoast,
+  recalcManualAmount,
+  fillManualAmounts,
 } from "./actions";
 
 type OrderRow = {
@@ -33,7 +35,11 @@ type Entry = {
   accountId?: string; // 연결된 기존 거래처(b2b_accounts) id
   cash?: boolean; // 현금 매출 여부
 };
-type Account = { id: string; name: string };
+type Account = {
+  id: string;
+  name: string;
+  prices?: Record<string, number>; // 품목명 → 단가 (금액 자동계산용)
+};
 
 function fmtDay(key: string): string {
   const [, m, d] = key.split("-");
@@ -70,6 +76,7 @@ export default function TodayRoast({
   const [cashInput, setCashInput] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
   const [month, setMonth] = useState(monthKey);
+  const [calcMsg, setCalcMsg] = useState<string | null>(null);
 
   const entries = manualEntries;
 
@@ -99,6 +106,18 @@ export default function TodayRoast({
     return accounts.find((a) => a.name === acc) ?? null;
   }, [account, accounts]);
 
+  // 고른 거래처 단가 × 입력 수량 = 자동 금액. 단가가 없으면 0.
+  const autoAmount = useMemo(() => {
+    const pm = linkedAccount?.prices;
+    if (!pm) return 0;
+    let sum = 0;
+    for (const p of columns) {
+      const q = Math.max(0, Math.round(Number(vals[p]) || 0));
+      if (q > 0) sum += (pm[p] ?? 0) * q;
+    }
+    return Math.round(sum);
+  }, [linkedAccount, vals, columns]);
+
   function add() {
     const qtys: Record<string, number> = {};
     for (const p of columns) {
@@ -107,7 +126,8 @@ export default function TodayRoast({
     }
     if (Object.keys(qtys).length === 0) return;
     const acc = account.trim();
-    const amt = Math.max(0, Math.round(Number(amount) || 0));
+    const typed = Math.max(0, Math.round(Number(amount) || 0));
+    const amt = typed > 0 ? typed : autoAmount;
     const accountId = accounts.find((a) => a.name === acc)?.id ?? null;
     const cash = cashInput;
     setAccount("");
@@ -375,9 +395,30 @@ export default function TodayRoast({
                           {e.amount.toLocaleString()}원
                         </span>
                       ) : (
-                        <span className="ml-1.5 text-xs font-normal text-rose-400">
-                          금액미입력
-                        </span>
+                        <>
+                          <span className="ml-1.5 text-xs font-normal text-rose-400">
+                            금액미입력
+                          </span>
+                          {e.accountId && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                startTransition(async () => {
+                                  const res = await recalcManualAmount(e.id);
+                                  setCalcMsg(
+                                    res.ok
+                                      ? `${e.account} ${res.amount?.toLocaleString()}원으로 계산됐어요`
+                                      : res.error ?? "계산 실패"
+                                  );
+                                  router.refresh();
+                                })
+                              }
+                              className="ml-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                            >
+                              단가로 계산
+                            </button>
+                          )}
+                        </>
                       )}
                     </td>
                     {columns.map((c, i) => (
@@ -521,8 +562,12 @@ export default function TodayRoast({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && add()}
-                placeholder="0"
-                className="w-24 h-9 text-right rounded-lg border border-stone-300 px-2 text-sm outline-none focus:border-amber-600"
+                placeholder={autoAmount > 0 ? autoAmount.toLocaleString() : "0"}
+                className={`w-24 h-9 text-right rounded-lg border px-2 text-sm outline-none focus:border-amber-600 ${
+                  !amount && autoAmount > 0
+                    ? "border-emerald-300 bg-emerald-50 placeholder:text-emerald-700 placeholder:font-semibold"
+                    : "border-stone-300"
+                }`}
               />
               <span className="text-xs text-stone-400">원</span>
             </div>
@@ -549,10 +594,58 @@ export default function TodayRoast({
             </button>
           </div>
           <div className="text-[11px] text-stone-400 mt-1.5">
-            💡 현금 체크 = 대표님 개인 수익(수익 계산 제외). 금액은 나중에 각 행의 <b>수정</b>으로 채워도 돼요.
+            💡 현금 체크 = 대표님 개인 수익(수익 계산 제외).
+            {linkedAccount && autoAmount > 0 ? (
+              <>
+                {" "}금액을 비워두면 <b>{linkedAccount.name}</b> 단가로{" "}
+                <b className="text-emerald-700">{autoAmount.toLocaleString()}원</b> 자동 계산돼요.
+              </>
+            ) : linkedAccount ? (
+              <>
+                {" "}<b>{linkedAccount.name}</b> 에 설정된 단가가 없어서 금액을 직접 넣어주셔야 해요.
+                (거래처 관리에서 단가를 넣으면 이후로는 자동 계산됩니다)
+              </>
+            ) : (
+              <> 금액은 나중에 각 행의 <b>수정</b>으로 채워도 돼요.</>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ── 금액 자동계산 ── */}
+      {(calcMsg || entries.some((e) => e.amount === 0 && e.accountId)) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+          {entries.some((e) => e.amount === 0 && e.accountId) && (
+            <>
+              <span className="text-sm text-emerald-900">
+                금액이 안 들어간 수기가{" "}
+                <b>{entries.filter((e) => e.amount === 0 && e.accountId).length}건</b>{" "}
+                있어요. 거래처 단가로 한 번에 채울 수 있습니다.
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  startTransition(async () => {
+                    const res = await fillManualAmounts();
+                    setCalcMsg(
+                      res.filled > 0
+                        ? `${res.filled}건 금액을 채웠어요.`
+                        : "채울 수 있는 행이 없어요. 거래처 단가를 먼저 넣어주세요."
+                    );
+                    router.refresh();
+                  })
+                }
+                className="h-8 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white hover:bg-emerald-800"
+              >
+                단가로 전부 계산
+              </button>
+            </>
+          )}
+          {calcMsg && (
+            <span className="text-sm font-semibold text-emerald-800">{calcMsg}</span>
+          )}
+        </div>
+      )}
 
       {/* ── 월마감: 이번 달 수기 내역 ── */}
       <div className="mt-3 rounded-xl border border-stone-200 overflow-hidden">
