@@ -5,6 +5,7 @@ import { roastDateKey } from "@/lib/roasting";
 import { mergeConfig } from "@/lib/roastConfig";
 import { vatAmounts, DEFAULT_VAT } from "@/lib/vat";
 import { parseMeta } from "@/lib/acctMeta";
+import { periodKey, periodRange } from "@/lib/statement";
 import ProfitView, {
   type MonthAgg,
   type PuEntry,
@@ -55,6 +56,35 @@ export default async function ProfitPage() {
   const acctName = new Map(
     (acctRows ?? []).map((a) => [a.id as string, a.company_name as string])
   );
+  // 거래처별 정산 시작일 (미설정 = 1 → 달력월 그대로)
+  const billDayMap = new Map(
+    (acctRows ?? []).map((a) => [
+      a.id as string,
+      parseMeta(a.memo as string | null).billDay ?? 1,
+    ])
+  );
+  /** 거래처별 표에서 쓸 기간 버킷. 정산 시작일이 지정돼 있으면 그 주기로,
+   *  없으면 기존 방식(fallbackYm) 그대로 묶는다. */
+  const bucketFor = (
+    iso: string,
+    accountId: string | null,
+    fallbackYm: string
+  ): string => {
+    const bd = accountId ? billDayMap.get(accountId) ?? 1 : 1;
+    return bd >= 2 ? periodKey(iso, bd) : fallbackYm;
+  };
+  /** '8/26~9/25' 같은 기간 라벨. 정산일 미설정이면 빈 문자열(달력월). */
+  const periodLabelFor = (ym: string, accountId: string | null): string => {
+    const bd = accountId ? billDayMap.get(accountId) ?? 1 : 1;
+    if (bd < 2) return "";
+    const [from, to] = periodRange(ym, bd);
+    const short = (d: string) => {
+      const [, m, dd] = d.split("-");
+      return `${Number(m)}/${Number(dd)}`;
+    };
+    return `${short(from)}~${short(to)}`;
+  };
+
   // 거래처별 부가세 모드 (현금 = 부가세 없음)
   const vatMode = new Map(
     (acctRows ?? []).map((a) => [
@@ -104,13 +134,14 @@ export default async function ProfitPage() {
 
   // 희연재 거래처별 주문내역 (월→거래처)
   const hyDetailMap: Record<string, Map<string, HyDetailRow>> = {};
-  const hyRow = (ym: string, account: string) => {
+  const hyRow = (ym: string, account: string, period = "") => {
     const mm = (hyDetailMap[ym] ??= new Map());
     let r = mm.get(account);
     if (!r) {
-      r = { account, kg: {}, revenue: 0 };
+      r = { account, kg: {}, revenue: 0, period };
       mm.set(account, r);
     }
+    if (period && !r.period) r.period = period;
     return r;
   };
 
@@ -134,7 +165,9 @@ export default async function ProfitPage() {
       if ((vatMode.get(acctId) ?? DEFAULT_VAT) === "cash") m.cashRevenue += rev;
       m.kg[pn] = (m.kg[pn] ?? 0) + qty;
       const name = acctName.get(acctId) ?? "(미지정)";
-      const r = hyRow(ym, name);
+      // 거래처별 표는 그 거래처의 정산주기로 묶는다 (월 집계 카드는 달력월 유지)
+      const bucket = bucketFor(created, acctId, ym);
+      const r = hyRow(bucket, name, periodLabelFor(bucket, acctId));
       r.revenue += rev;
       r.kg[pn] = (r.kg[pn] ?? 0) + qty;
     }
@@ -177,7 +210,9 @@ export default async function ProfitPage() {
       });
     } else {
       const acc = (r.account as string)?.trim() || "(수기)";
-      const hr = hyRow(ym, acc);
+      const mAcctId = (r.account_id as string) ?? null;
+      const mBucket = bucketFor((r.roast_date as string) ?? "", mAcctId, ym);
+      const hr = hyRow(mBucket, acc, periodLabelFor(mBucket, mAcctId));
       hr.revenue += amount;
       for (const [pn, kg] of Object.entries(qtys)) {
         hr.kg[pn] = (hr.kg[pn] ?? 0) + (kg ?? 0);

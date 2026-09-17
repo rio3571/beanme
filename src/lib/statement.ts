@@ -23,7 +23,7 @@ function kstDateStr(iso: string): string {
 }
 
 /** 주문일 → 정산주기 라벨(끝나는 달 기준). billDay>=2면 전월billDay~당월(billDay-1) */
-function periodKey(iso: string, billDay: number): string {
+export function periodKey(iso: string, billDay: number): string {
   const k = new Date(new Date(iso).getTime() + 9 * 3600 * 1000);
   let y = k.getUTCFullYear();
   let m = k.getUTCMonth(); // 0-11
@@ -39,7 +39,7 @@ function periodKey(iso: string, billDay: number): string {
 }
 
 /** 정산주기 라벨 → [시작일, 종료일] (YYYY-MM-DD) */
-function periodRange(key: string, billDay: number): [string, string] {
+export function periodRange(key: string, billDay: number): [string, string] {
   const [y, m] = key.split("-").map(Number); // m: 1-12
   if (billDay >= 2) {
     const from = new Date(Date.UTC(y, m - 2, billDay));

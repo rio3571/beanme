@@ -40,6 +40,7 @@ export type HyDetailRow = {
   account: string;
   kg: Record<string, number>;
   revenue: number;
+  period?: string; // 정산주기 라벨 '8/26~9/25' (정산일 지정한 거래처만)
 };
 
 type Brand = "희연재" | "푸르파파" | "합산";
@@ -314,7 +315,7 @@ export default function ProfitView({
             for (const r of hyDetail[k] ?? []) {
               let m = merged.get(r.account);
               if (!m) {
-                m = { account: r.account, kg: {}, revenue: 0 };
+                m = { account: r.account, kg: {}, revenue: 0, period: r.period };
                 merged.set(r.account, m);
               }
               m.revenue += r.revenue;
@@ -763,6 +764,13 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
               {hyRows.length}곳
             </span>
           </div>
+          {hyRows.some((r) => r.period) && (
+            <div className="px-4 pt-2.5 text-[11px] leading-relaxed text-stone-500">
+              ※ <b className="text-amber-800">주황색 기간</b>이 붙은 거래처는 <b>정산 시작일</b>이
+              지정돼 있어 달력 1~말일이 아니라 그 기간으로 합산됩니다. (거래처 관리에서 변경)
+              그래서 이 표의 매출 합계는 위 매출 카드(달력월 기준)와 다를 수 있어요.
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -787,6 +795,14 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
                     <tr key={i}>
                       <td className="px-3 py-2 font-medium text-stone-800 whitespace-nowrap">
                         {r.account}
+                        {r.period && (
+                          <span
+                            className="ml-1.5 align-middle rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
+                            title="이 거래처는 정산 시작일이 지정돼 있어 이 기간으로 합산됩니다"
+                          >
+                            {r.period}
+                          </span>
+                        )}
                       </td>
                       {productNames.map((p) => (
                         <td
