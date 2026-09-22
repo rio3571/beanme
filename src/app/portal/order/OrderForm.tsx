@@ -21,6 +21,8 @@ export default function OrderForm({
   vatMode = DEFAULT_VAT,
   units = [],
   initialUnit,
+  doneHref = "/portal/orders",
+  doneLabel = "주문내역으로",
 }: {
   items: OrderItem[];
   orderId?: string;
@@ -29,6 +31,8 @@ export default function OrderForm({
   vatMode?: VatMode;
   units?: string[];
   initialUnit?: string;
+  doneHref?: string;
+  doneLabel?: string;
 }) {
   const [qty, setQty] = useState<Record<string, number>>(initialQty ?? {});
   const [note, setNote] = useState(initialNote ?? "");
@@ -85,10 +89,10 @@ export default function OrderForm({
           주문내역에서 확인할 수 있어요.
         </p>
         <a
-          href="/portal/orders"
+          href={doneHref}
           className="inline-block mt-6 rounded-xl bg-amber-700 text-white font-semibold px-6 py-3 hover:bg-amber-800"
         >
-          주문내역으로
+          {doneLabel}
         </a>
       </div>
     );

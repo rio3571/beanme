@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMyAccount } from "@/lib/portal";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -177,6 +178,15 @@ export default async function AdminOrdersPage() {
             {won(o.total_amount)}
           </div>
           <StatusSelect orderId={o.id} initial={o.status} />
+          {o.status !== "canceled" && (
+            <Link
+              href={`/portal/order/${o.id}/edit`}
+              title="수량·품목 수정"
+              className="shrink-0 rounded-lg border border-stone-300 px-2 py-1 text-xs font-semibold text-stone-500 hover:border-amber-600 hover:text-amber-700"
+            >
+              수정
+            </Link>
+          )}
           <DeleteOrderButton orderId={o.id} />
         </div>
         {o.note && (

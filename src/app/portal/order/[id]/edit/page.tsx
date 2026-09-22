@@ -22,9 +22,10 @@ export default async function EditOrderPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const account = await getMyAccount();
-  if (!account) redirect("/portal/login");
-  if (account.role === "admin") redirect("/portal/admin/orders");
+  const me = await getMyAccount();
+  if (!me) redirect("/portal/login");
+  const isAdmin = me.role === "admin";
+  const backHref = isAdmin ? "/portal/admin/orders" : "/portal/orders";
 
   const admin = createAdminClient();
   const { data: order } = await admin
@@ -32,10 +33,26 @@ export default async function EditOrderPage({
     .select("id, account_id, status, note, order_no, unit")
     .eq("id", id)
     .maybeSingle();
-  if (!order || order.account_id !== account.id) redirect("/portal/orders");
-  if (order.status === "done" || order.status === "canceled") {
-    redirect("/portal/orders");
+  if (!order) redirect(backHref);
+
+  // 관리자는 거래처 주문도 수정할 수 있다. 단가·부가세·층은 그 거래처 기준을 쓴다.
+  let account = me;
+  if (isAdmin) {
+    const { data: acct } = await admin
+      .from("b2b_accounts")
+      .select("*")
+      .eq("id", order.account_id as string)
+      .maybeSingle();
+    if (!acct) redirect(backHref);
+    account = acct as typeof me;
+  } else {
+    if (order.account_id !== me.id) redirect("/portal/orders");
+    if (order.status === "done" || order.status === "canceled") {
+      redirect("/portal/orders");
+    }
   }
+  // 취소된 주문은 관리자도 수정 대상이 아니다 (되살리려면 상태를 먼저 바꿔야 함)
+  if (isAdmin && order.status === "canceled") redirect(backHref);
 
   const { data: prodData } = await admin
     .from("products")
@@ -77,15 +94,35 @@ export default async function EditOrderPage({
 
   return (
     <div>
-      <Link href="/portal/orders" className="text-sm text-stone-400">
-        ‹ 주문내역
+      <Link href={backHref} className="text-sm text-stone-400">
+        ‹ {isAdmin ? "전체 주문" : "주문내역"}
       </Link>
       <h1 className="text-lg font-bold text-stone-800 mt-1 mb-1">
         주문 수정 · {order.order_no}
       </h1>
-      <p className="text-sm text-stone-500 mb-4">
-        수량을 바꾸고 수정 저장을 누르세요.
-      </p>
+      {isAdmin ? (
+        <div className="mb-4">
+          <p className="text-sm text-stone-500">
+            <b className="text-stone-700">{account.company_name}</b> 의 주문을 대신
+            수정합니다. 단가는 이 거래처에 설정된 값이 적용됩니다.
+          </p>
+          {order.status === "done" && (
+            <p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+              ⚠️ 이미 <b>완료</b>된 주문입니다. 수정하면 거래명세서 금액도 함께 바뀝니다.
+            </p>
+          )}
+          {(order.status === "confirmed" || order.status === "shipped") && (
+            <p className="mt-2 rounded-lg bg-stone-50 border border-stone-200 px-3 py-2 text-sm text-stone-600">
+              확인·출고 처리된 주문입니다. 관리자 수정은 <b>상태를 그대로 유지</b>하고,
+              거래처에 알림도 가지 않습니다.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-stone-500 mb-4">
+          수량을 바꾸고 수정 저장을 누르세요.
+        </p>
+      )}
       <OrderForm
         items={items}
         orderId={id}
@@ -94,6 +131,8 @@ export default async function EditOrderPage({
         vatMode={parseMeta(account.memo).vat ?? DEFAULT_VAT}
         units={parseMeta(account.memo).units ?? []}
         initialUnit={(order.unit as string) ?? ""}
+        doneHref={backHref}
+        doneLabel={isAdmin ? "전체 주문으로" : "주문내역으로"}
       />
     </div>
   );
