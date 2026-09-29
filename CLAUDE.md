@@ -267,3 +267,15 @@ data/
 - 거래처 목록에 `아이디 없음` 뱃지, 상세 페이지는 로그인 정보 카드 대신 안내 카드(대리주문 링크). `AccountRow`에 `auth_user_id` 추가.
 - ⚠️ **정식 `b2b_orders`로 저장** → 로스팅 목록·거래명세서·세금계산서·수익관리에 전부 자동 반영. (수기 `roast_manual`은 로스팅·수익만 반영되는 것과 다름)
 - 제안했으나 미구현: 거래처 선택 시 **지난 주문 수량 자동 채우기**(고정 주문이 많다고 함) — 사용자 답변 대기.
+
+### 2026-09-17 ~ 09-22 로스팅 수기 금액 자동화 + 정산주기 + 품목 노출 + 관리자 주문수정
+
+**배경**: 아이디 없는 "간이 거래처"(해그린베이커리 등)를 로스팅 **수기**로 넣는데, 거래처 단가를 다 넣어뒀는데도 수기 `amount`가 0이라 수익관리 매출에 안 잡혔다.
+
+- **`amountFromPrices(admin, accountId, qtys)`** (`roasting/actions.ts`): `account_prices` → `products.base_price` 순으로 단가를 찾아 수량과 곱해 합산. 단가가 하나도 없으면 **null**(건드리지 않음). 저장 금액은 공급가(net) — 포털 `line_amount`와 같은 기준.
+- `addManualRoast`/`updateManualRoast`: 금액을 **비워두면 자동 계산**. `fillManualAmounts(month?)` 일괄 채우기, `recalcManualAmount(id)` 한 행.
+- `TodayRoast`: 거래처 고르면 금액칸에 **초록 placeholder로 자동금액 미리보기**, 0원 행에 `단가로 계산` 버튼, 상단에 `단가로 전부 계산` 바. 로스팅 page가 `account_prices`+전체 products를 조회해 `accounts[].prices = {품목명: 단가}`로 내려준다.
+- **수익관리도 같은 환산**: `profit/page.tsx` `manualAmount(stored, accountId, qtys)` — stored가 0일 때만 단가로 환산. 매출카드·거래처별표·수기금액편집이 전부 같은 값을 쓴다. (버튼 안 눌러도 보이게)
+- **거래처별 정산주기 적용**: `lib/statement.ts`의 `periodKey`/`periodRange`를 **export**해서 거래명세서와 같은 로직 재사용. profit의 `bucketFor(iso, accountId, fallbackYm)` — billDay>=2면 그 주기, 아니면 기존 방식. 거래처별 표 행에 `8/25~9/24` 골드 뱃지 + 안내문. **월 매출카드·원가·이익은 달력월 유지**(공장 전체 기준이라 섞으면 안 됨) → 표 합계와 카드가 다를 수 있음을 화면에 명시.
+- **거래처별 공용 품목 노출 선택**: `acctMeta.hidden`(숨길 product id 배열, memo JSON). `setAccountHiddenProducts()`는 숨긴 뒤 주문 가능 품목이 0이면 거부. `VisibilityForm`(거래처 상세 체크박스). 반영 3곳 = 거래처 주문화면 / 주문 수정화면 / 관리자 대리주문 폼. **수정화면은 이미 그 주문에 담긴 품목이면 숨겨도 남긴다**(수량 못 고치는 문제 방지).
+- **관리자 주문 수정**: `editOrder`는 원래 admin을 허용하고 있었고 **화면만 막혀 있었음**. `order/[id]/edit`의 admin 리다이렉트 제거 → 주문의 거래처를 불러와 그 기준으로 폼 구성. 완료 주문은 경고 후 허용, 취소 주문은 제외. 관리자 수정은 상태 유지 + 거래처 알림 없음. 관리자 주문목록 각 행에 `수정` 버튼. `OrderForm`에 `doneHref`/`doneLabel` 추가.
