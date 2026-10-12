@@ -42,12 +42,18 @@ export default async function AdminChatPage({
 
   return (
     <div>
-      <Link href="/portal/admin/messages" className="text-sm text-stone-400">
-        ‹ 문의 목록
-      </Link>
-      <h1 className="text-lg font-bold text-stone-800 mt-1 mb-4">
-        {acct.company_name}
-      </h1>
+      {/* 대화가 길어져도 누구와 하는 대화인지 보이게 */}
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-2.5 bg-stone-50/95 backdrop-blur border-b border-stone-200 mb-4">
+        <Link
+          href="/portal/admin/messages"
+          className="text-xs text-stone-400 hover:text-stone-600"
+        >
+          ‹ 문의 목록
+        </Link>
+        <h1 className="text-base font-bold text-stone-800 leading-tight">
+          {acct.company_name}
+        </h1>
+      </div>
       <Chat accountId={id} role="admin" initial={(data ?? []) as MsgRow[]} />
     </div>
   );

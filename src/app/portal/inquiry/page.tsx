@@ -28,10 +28,12 @@ export default async function InquiryPage() {
 
   return (
     <div>
-      <h1 className="text-lg font-bold text-stone-800 mb-1">문의</h1>
-      <p className="text-sm text-stone-500 mb-4">
-        희연재 원두사업부에 자유롭게 문의하세요.
-      </p>
+      <div className="mb-4">
+        <h1 className="text-lg font-bold text-stone-800">문의</h1>
+        <p className="text-sm text-stone-500 mt-0.5">
+          희연재 원두사업부에 자유롭게 문의하세요. 보통 영업시간 안에 답변드립니다.
+        </p>
+      </div>
       <Chat accountId={account.id} role="buyer" initial={(data ?? []) as MsgRow[]} />
     </div>
   );
