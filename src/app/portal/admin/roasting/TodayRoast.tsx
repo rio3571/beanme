@@ -22,6 +22,7 @@ type OrderRow = {
   orderedQ: Record<string, number>; // 주문 수량
   shippedQ: Record<string, number>; // 보낸 수량
   orderIds: string[];
+  orderedAt: string[];
   status: string;
 };
 type Entry = {
@@ -293,6 +294,7 @@ export default function TodayRoast({
                   key={r.accountId}
                   name={r.name}
                   orderIds={r.orderIds}
+                  orderedAt={r.orderedAt}
                   columns={columns}
                   ordered={columns.map((c) => r.orderedQ[c] ?? 0)}
                   shipped={columns.map((c) => r.shippedQ[c] ?? 0)}

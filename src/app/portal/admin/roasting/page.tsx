@@ -9,6 +9,7 @@ import {
 } from "@/lib/roasting";
 import RoastingRow from "./RoastingRow";
 import TodayRoast from "./TodayRoast";
+import DoneHistory from "./DoneHistory";
 import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ export default async function RoastingPage() {
     { data: priceData },
     { data: allProdData },
     { data: monthOrderData },
+    { data: doneData },
   ] = await Promise.all([
     admin
       .from("b2b_orders")
@@ -76,6 +78,12 @@ export default async function RoastingPage() {
       .neq("status", "canceled")
       .gte("created_at", monthAggFromIso)
       .limit(1000),
+    admin
+      .from("b2b_orders")
+      .select("id, account_id, created_at, unit")
+      .eq("status", "done")
+      .order("created_at", { ascending: false })
+      .limit(80),
   ]);
   const orders = (orderData ?? []) as OrderRow[];
 
@@ -168,6 +176,7 @@ export default async function RoastingPage() {
   type AcctAgg = {
     name: string;
     orderIds: string[];
+    createdAts: string[]; // 고객이 주문한 시각들
     qty: Map<string, number>; // 주문 수량
     shipped: Map<string, number>; // 보낸 수량
     status: string; // 가장 진행 안 된 상태
@@ -190,6 +199,7 @@ export default async function RoastingPage() {
       a = {
         name: o.unit ? `${base} ${o.unit}` : base,
         orderIds: [],
+        createdAts: [],
         qty: new Map(),
         shipped: new Map(),
         status: "done",
@@ -198,6 +208,7 @@ export default async function RoastingPage() {
       b.order.push(gid);
     }
     a.orderIds.push(o.id);
+    a.createdAts.push(o.created_at);
     // 가장 진행 안 된 상태로 유지
     if (
       STATUS_PRIORITY.indexOf(o.status) < STATUS_PRIORITY.indexOf(a.status)
@@ -245,12 +256,42 @@ export default async function RoastingPage() {
           orderedQ,
           shippedQ,
           orderIds: a.orderIds,
+          orderedAt: a.createdAts,
           status: a.status,
         };
       })
     : []
   ).filter((r) => columns.some((c) => r.qtys[c] > 0)); // 다 보낸 거래처는 숨김
   const otherKeys = ordered.filter((k) => k !== roastAnchor);
+
+  // 완료된 주문 이력 (실수로 완료 눌렀을 때 확인·되돌리기)
+  const doneOrders = (doneData ?? []) as Omit<OrderRow, "status" | "shipped">[];
+  const doneItemsByOrder = new Map<string, Record<string, number>>();
+  if (doneOrders.length > 0) {
+    const { data: dItems } = await admin
+      .from("b2b_order_items")
+      .select("order_id, product_name, qty")
+      .in(
+        "order_id",
+        doneOrders.map((o) => o.id)
+      );
+    for (const it of dItems ?? []) {
+      const m = doneItemsByOrder.get(it.order_id as string) ?? {};
+      const pn = it.product_name as string;
+      m[pn] = (m[pn] ?? 0) + ((it.qty as number) ?? 0);
+      doneItemsByOrder.set(it.order_id as string, m);
+    }
+  }
+  const doneHistory = doneOrders.map((o) => {
+    const base = nameMap.get(o.account_id) ?? "—";
+    return {
+      id: o.id,
+      name: o.unit ? `${base} ${o.unit}` : base,
+      createdAt: o.created_at,
+      roastDate: roastDateKey(o.created_at),
+      items: doneItemsByOrder.get(o.id) ?? {},
+    };
+  });
 
   return (
     <div>
@@ -296,6 +337,7 @@ export default async function RoastingPage() {
                   aid,
                   name: a.name,
                   orderIds: a.orderIds,
+                  orderedAt: a.createdAts,
                   status: a.status,
                   orderedQ,
                   shippedQ,
@@ -367,6 +409,7 @@ export default async function RoastingPage() {
                           key={r.aid}
                           name={r.name}
                           orderIds={r.orderIds}
+                          orderedAt={r.orderedAt}
                           columns={columns}
                           ordered={r.orderedQ}
                           shipped={r.shippedQ}
@@ -397,6 +440,8 @@ export default async function RoastingPage() {
           })}
         </div>
       )}
+
+      <DoneHistory rows={doneHistory} />
     </div>
   );
 }

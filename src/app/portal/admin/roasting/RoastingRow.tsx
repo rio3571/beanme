@@ -10,9 +10,18 @@ const BTNS = [
   { v: "done", l: "완료" },
 ];
 
+// 'M/D(요) HH:MM' (KST)
+export function fmtOrderedAt(ts: string): string {
+  const k = new Date(new Date(ts).getTime() + 9 * 60 * 60 * 1000);
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][k.getUTCDay()];
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${k.getUTCMonth() + 1}/${k.getUTCDate()}(${wd}) ${p(k.getUTCHours())}:${p(k.getUTCMinutes())}`;
+}
+
 export default function RoastingRow({
   name,
   orderIds,
+  orderedAt,
   columns,
   ordered,
   shipped,
@@ -20,6 +29,7 @@ export default function RoastingRow({
 }: {
   name: string;
   orderIds: string[];
+  orderedAt?: string[]; // 고객 주문 시각
   columns: string[];
   ordered: number[]; // 품목별 주문 수량
   shipped: number[]; // 품목별 보낸 수량
@@ -75,6 +85,11 @@ export default function RoastingRow({
             <span className="ml-1.5 text-[10px] font-bold text-sky-700 bg-sky-100 rounded px-1 py-0.5 align-middle">
               일부출고
             </span>
+          )}
+          {orderedAt && orderedAt.length > 0 && (
+            <div className="text-[11px] font-normal text-stone-400 tabular-nums">
+              {[...orderedAt].sort().map(fmtOrderedAt).join(" · ")} 주문
+            </div>
           )}
         </td>
         {remaining.map((q, i) => (
