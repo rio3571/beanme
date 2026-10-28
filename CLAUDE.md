@@ -1,11 +1,11 @@
 # beanme — 원두 구독·B2B 공급·선물 웹 서비스
 
-퍼파파(프랜차이즈 카페) 대표의 별도 사업. **봇 프로젝트(`C:\Users\COFFEE DZ\Desktop\purpapa-b2b`)와 완전 분리**.
+퍼파파(프랜차이즈 카페) 대표의 별도 사업. **봇 프로젝트(`C:\dev\purpapa-b2b`)와 완전 분리**.
 
 ## 환경 / 실행
 
 - 스택: Next.js 16 + TypeScript + Tailwind + App Router
-- 위치: `D:\beanme` (D 드라이브 — 용량 여유)
+- 위치: `C:\dev\beanme` (D 드라이브 — 용량 여유)
 - 개발: `npm run dev` (http://localhost:3000)
 - 빌드: `npm run build`
 - 타입 체크: `npx tsc --noEmit`
@@ -279,3 +279,13 @@ data/
 - **거래처별 정산주기 적용**: `lib/statement.ts`의 `periodKey`/`periodRange`를 **export**해서 거래명세서와 같은 로직 재사용. profit의 `bucketFor(iso, accountId, fallbackYm)` — billDay>=2면 그 주기, 아니면 기존 방식. 거래처별 표 행에 `8/25~9/24` 골드 뱃지 + 안내문. **월 매출카드·원가·이익은 달력월 유지**(공장 전체 기준이라 섞으면 안 됨) → 표 합계와 카드가 다를 수 있음을 화면에 명시.
 - **거래처별 공용 품목 노출 선택**: `acctMeta.hidden`(숨길 product id 배열, memo JSON). `setAccountHiddenProducts()`는 숨긴 뒤 주문 가능 품목이 0이면 거부. `VisibilityForm`(거래처 상세 체크박스). 반영 3곳 = 거래처 주문화면 / 주문 수정화면 / 관리자 대리주문 폼. **수정화면은 이미 그 주문에 담긴 품목이면 숨겨도 남긴다**(수량 못 고치는 문제 방지).
 - **관리자 주문 수정**: `editOrder`는 원래 admin을 허용하고 있었고 **화면만 막혀 있었음**. `order/[id]/edit`의 admin 리다이렉트 제거 → 주문의 거래처를 불러와 그 기준으로 폼 구성. 완료 주문은 경고 후 허용, 취소 주문은 제외. 관리자 수정은 상태 유지 + 거래처 알림 없음. 관리자 주문목록 각 행에 `수정` 버튼. `OrderForm`에 `doneHref`/`doneLabel` 추가.
+
+### 2026-10-28 로스팅 목록 주문시각 + 완료 이력·되돌리기
+
+**배경**: 로스팅 목록의 행이 언제 들어온 주문인지 알기 어렵고, 실수로 `완료`를 눌러도 목록에서 사라져 다시 볼 수 없었다.
+
+- **주문 시각 표시**: `roasting/page.tsx`가 거래처 집계(`AcctAgg.createdAts`)에 주문 `created_at`을 모아 `orderedAt`으로 `RoastingRow`에 전달. 거래처명 밑에 `10/27(월) 14:30 주문`(KST, 여러 건이면 ` · `로 연결). 포맷터 `fmtOrderedAt`은 `RoastingRow.tsx`에서 export. `TodayRoast`(현재 배치)와 지난 배치 표 둘 다 적용.
+- **완료 이력 `DoneHistory.tsx`**: 로스팅 페이지 맨 아래 접이식. `status='done'` 최근 80건(거래처·주문시각·로스팅일·품목수량).
+- **되돌리기**: 확인창 후 `updateOrdersStatus([id], "requested")`. ⚠️ **일부러 `접수(requested)`로 되돌림** — `confirmed`로 보내면 `notifyStatusToBuyers`가 거래처에 "주문이 접수되었습니다" 메시지를 보내버린다(`requested`는 알림 없음).
+- 커밋 `344a80a`, 프로덕션 배포 완료. 실제 화면 확인은 사용자 몫(되돌리기는 실주문에 영향).
+- 같은 날: 전역 `~/.claude/settings.json`에 `git add/commit`, `git push origin main`, `vercel --prod --yes` 허용 규칙 추가 → 자동 배포 가능.
