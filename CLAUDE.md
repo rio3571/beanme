@@ -289,3 +289,12 @@ data/
 - **되돌리기**: 확인창 후 `updateOrdersStatus([id], "requested")`. ⚠️ **일부러 `접수(requested)`로 되돌림** — `confirmed`로 보내면 `notifyStatusToBuyers`가 거래처에 "주문이 접수되었습니다" 메시지를 보내버린다(`requested`는 알림 없음).
 - 커밋 `344a80a`, 프로덕션 배포 완료. 실제 화면 확인은 사용자 몫(되돌리기는 실주문에 영향).
 - 같은 날: 전역 `~/.claude/settings.json`에 `git add/commit`, `git push origin main`, `vercel --prod --yes` 허용 규칙 추가 → 자동 배포 가능.
+
+### 2026-11-03 수기 입력 ↔ 거래처 연동 + 거래내역서 자동 합산 / 간이명세서에서 수기 수정
+
+**배경**: 해그린베이커리처럼 아이디 없이 항상 수기로 들어오는 거래처는 간이명세서에서 매번 수기 입력을 가져와야 했다.
+
+- **`lib/statement.ts` `loadStatement`**: `roast_manual`에서 `account_id = 이 거래처`인 행을 **거래내역서에 자동 합침**(월 목록·날짜 지정 구간 포함). 거래처 단가(account_prices → base_price)로 환산한 합계가 저장 금액과 같으면 **품목별 행**(산 10kg × 단가), 다르면(수기로 총금액을 고친 경우) `로스팅 · 산 10kg · …` **한 줄(저장 금액)**. 세금계산서 발행(`issueTaxInvoice`)·거래처 포털 거래내역도 같은 함수라 함께 반영됨.
+- **거래처 상세 `ManualLinkCard`**: 연결된 수기 건수·최근 5건 + **이름이 같은데 미연결인 수기 N건 `모두 연결하기`**(`linkManualToAccount`, 이름 정확 일치만). 수기 입력할 때 거래처명을 정확히 고르면 이미 자동 연결(`TodayRoast`).
+- 간이명세서 목록에 수기 항목별 `수정` 버튼(거래처·날짜·품목 수량·금액, 금액 비우면 단가 자동) — `updateManualRoast`에 `roastDate` 추가, 반환에 `amount`.
+- ⚠️ 같은 납품을 정식 주문과 수기 둘 다 넣으면 거래내역서에 중복됨. 로그인 E2E·배포 후 실화면 확인은 미검증. 커밋 `583e4e7`(푸시·배포 대기).
