@@ -139,8 +139,9 @@ export async function updateManualRoast(
     accountId?: string | null;
     cash?: boolean;
     oem?: boolean;
+    roastDate?: string; // YYYY-MM-DD (간이명세서에서 날짜까지 고칠 때)
   }
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; amount?: number }> {
   if (!(await isAdmin())) return { ok: false };
   const admin = createAdminClient();
 
@@ -159,11 +160,13 @@ export async function updateManualRoast(
       account_id: input.accountId || null,
       ...(input.cash === undefined ? {} : { cash: input.cash === true }),
       ...(input.oem === undefined ? {} : { oem: input.oem === true }),
+      ...(input.roastDate && /^\d{4}-\d{2}-\d{2}$/.test(input.roastDate) ? { roast_date: input.roastDate } : {}),
     })
     .eq("id", id);
   revalidatePath("/portal/admin/roasting");
   revalidatePath("/portal/admin/profit");
-  return { ok: true };
+  revalidatePath("/portal/admin/quick-statement");
+  return { ok: true, amount };
 }
 
 export async function removeManualRoast(id: string): Promise<{ ok: boolean }> {
@@ -300,4 +303,24 @@ export async function recalcManualAmount(
   revalidatePath("/portal/admin/roasting");
   revalidatePath("/portal/admin/profit");
   return { ok: true, amount: amt };
+}
+
+/** 거래처 이름과 똑같은데 아직 연결 안 된 로스팅 수기 입력을 이 거래처에 연결 */
+export async function linkManualToAccount(accountId: string): Promise<{ ok: boolean; linked?: number }> {
+  if (!(await isAdmin())) return { ok: false };
+  const admin = createAdminClient();
+  const { data: acct } = await admin.from("b2b_accounts").select("company_name").eq("id", accountId).maybeSingle();
+  const name = ((acct?.company_name as string) ?? "").trim();
+  if (!name) return { ok: false };
+  const { data: rows } = await admin
+    .from("roast_manual")
+    .select("id")
+    .is("account_id", null)
+    .eq("account", name);
+  const ids = (rows ?? []).map((r) => r.id as string);
+  if (ids.length > 0) await admin.from("roast_manual").update({ account_id: accountId }).in("id", ids);
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  revalidatePath("/portal/admin/roasting");
+  revalidatePath("/portal/admin/quick-statement");
+  return { ok: true, linked: ids.length };
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import StatementView, { type StmtRow } from "@/components/StatementView";
 import { VAT_MODES, VAT_LABEL, VAT_DESC, DEFAULT_VAT, type VatMode } from "@/lib/vat";
+import { updateManualRoast } from "@/app/portal/admin/roasting/actions";
 import {
   saveQuickAccount,
   deleteQuickAccount,
@@ -19,6 +20,7 @@ function emailStoreKey(companyName: string) {
 export type ManualEntry = {
   id: string;
   account: string;
+  accountId: string | null;
   qtys: Record<string, number>;
   roastDate: string;
   amount: number;
@@ -31,7 +33,12 @@ type Row = {
   name: string;
   qty: string;
   unitPrice: string;
+  manualId?: string; // 로스팅 수기에서 가져온 줄이면 그 수기 id (수정 시 같이 갱신)
 };
+
+const BASE_ITEMS = ["산", "바다", "노을", "디카페인"];
+
+type Draft = { account: string; date: string; amount: string; qtys: Record<string, string> };
 
 function qtysSummary(qtys: Record<string, number>): string {
   return Object.entries(qtys)
@@ -84,6 +91,10 @@ export default function QuickStatementForm({
   const [manualQuery, setManualQuery] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [imported, setImported] = useState<Set<string>>(new Set());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editErr, setEditErr] = useState("");
 
   // 거래처명을 입력/선택하면, 예전에 이 거래처명으로 저장해둔 이메일이 있으면 자동으로 채워준다.
   useEffect(() => {
@@ -165,6 +176,47 @@ export default function QuickStatementForm({
       .slice(0, 100);
   }, [manualEntries, manualQuery]);
 
+  function startEdit(m: ManualEntry) {
+    const items = [...BASE_ITEMS, ...Object.keys(m.qtys).filter((k) => !BASE_ITEMS.includes(k))];
+    const qtys: Record<string, string> = {};
+    for (const k of items) qtys[k] = m.qtys[k] ? String(m.qtys[k]) : "";
+    setDraft({ account: m.account, date: m.roastDate, amount: m.amount ? String(m.amount) : "", qtys });
+    setEditingId(m.id);
+    setEditErr("");
+  }
+
+  async function saveEdit(m: ManualEntry) {
+    if (!draft) return;
+    setEditBusy(true);
+    setEditErr("");
+    const qtys: Record<string, number> = {};
+    for (const [k, v] of Object.entries(draft.qtys)) {
+      const n = Number(v);
+      if (n > 0) qtys[k] = n;
+    }
+    const res = await updateManualRoast(m.id, {
+      account: draft.account,
+      qtys,
+      amount: Number(draft.amount) || 0, // 비우면 거래처 단가로 자동 계산
+      accountId: m.accountId,
+      roastDate: draft.date,
+    });
+    setEditBusy(false);
+    if (!res.ok) return setEditErr("저장에 실패했습니다.");
+    // 이미 명세서 품목으로 가져온 줄이면 같이 고친다
+    const newAmount = res.amount ?? (Number(draft.amount) || 0);
+    setRows((prev) =>
+      prev.map((r) =>
+        r.manualId === m.id
+          ? { ...r, date: draft.date || r.date, name: `로스팅 · ${qtysSummary(qtys)}`, qty: "1", unitPrice: String(newAmount) }
+          : r
+      )
+    );
+    setEditingId(null);
+    setDraft(null);
+    router.refresh();
+  }
+
   function toggleCheck(id: string) {
     setChecked((prev) => {
       const next = new Set(prev);
@@ -184,6 +236,7 @@ export default function QuickStatementForm({
       name: `로스팅 · ${qtysSummary(m.qtys)}`,
       qty: "1",
       unitPrice: String(m.amount || 0),
+      manualId: m.id,
     }));
 
     setRows((prev) => {
@@ -376,31 +429,112 @@ export default function QuickStatementForm({
             )}
             {filteredManual.map((m) => {
               const done = imported.has(m.id);
+              const editing = editingId === m.id && draft;
               return (
-                <label
-                  key={m.id}
-                  className={`flex items-center gap-3 border rounded-lg px-3 py-2 text-sm cursor-pointer ${
-                    done
-                      ? "border-stone-200 bg-stone-50 text-stone-400"
-                      : checked.has(m.id)
-                      ? "border-amber-400 bg-amber-50"
-                      : "border-stone-200 hover:bg-stone-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked.has(m.id)}
-                    onChange={() => toggleCheck(m.id)}
-                    className="shrink-0"
-                  />
-                  <span className="w-[86px] shrink-0 text-stone-500">{m.roastDate}</span>
-                  <span className="w-[110px] shrink-0 font-medium truncate">{m.account || "(거래처 미기재)"}</span>
-                  <span className="flex-1 min-w-0 truncate text-stone-500">{qtysSummary(m.qtys)}</span>
-                  <span className="w-[100px] shrink-0 text-right font-medium">
-                    {m.amount.toLocaleString("ko-KR")}원
-                  </span>
-                  {done && <span className="text-[11px] shrink-0">추가됨</span>}
-                </label>
+                <div key={m.id}>
+                  <label
+                    className={`flex items-center gap-3 border rounded-lg px-3 py-2 text-sm cursor-pointer ${
+                      done
+                        ? "border-stone-200 bg-stone-50 text-stone-400"
+                        : checked.has(m.id)
+                        ? "border-amber-400 bg-amber-50"
+                        : "border-stone-200 hover:bg-stone-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked.has(m.id)}
+                      onChange={() => toggleCheck(m.id)}
+                      className="shrink-0"
+                    />
+                    <span className="w-[86px] shrink-0 text-stone-500">{m.roastDate}</span>
+                    <span className="w-[110px] shrink-0 font-medium truncate">{m.account || "(거래처 미기재)"}</span>
+                    <span className="flex-1 min-w-0 truncate text-stone-500">{qtysSummary(m.qtys)}</span>
+                    <span className="w-[100px] shrink-0 text-right font-medium">
+                      {m.amount.toLocaleString("ko-KR")}원
+                    </span>
+                    {done && <span className="text-[11px] shrink-0">추가됨</span>}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (editingId === m.id) {
+                          setEditingId(null);
+                          setDraft(null);
+                        } else startEdit(m);
+                      }}
+                      className="shrink-0 rounded-md border border-stone-300 bg-white px-2 py-1 text-[11px] font-semibold text-stone-600 hover:bg-stone-100"
+                    >
+                      {editingId === m.id ? "닫기" : "수정"}
+                    </button>
+                  </label>
+                  {editing && (
+                    <div className="mt-1 mb-2 space-y-2 rounded-lg border border-amber-300 bg-amber-50/60 p-3">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <label className="text-xs font-semibold text-stone-600">
+                          거래처
+                          <input
+                            value={draft.account}
+                            onChange={(e) => setDraft({ ...draft, account: e.target.value })}
+                            className="mt-1 w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm"
+                          />
+                        </label>
+                        <label className="text-xs font-semibold text-stone-600">
+                          날짜
+                          <input
+                            type="date"
+                            value={draft.date}
+                            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                            className="mt-1 w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm"
+                          />
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {Object.keys(draft.qtys).map((k) => (
+                          <label key={k} className="text-xs font-semibold text-stone-600">
+                            {k} (kg)
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              inputMode="decimal"
+                              value={draft.qtys[k]}
+                              onChange={(e) => setDraft({ ...draft, qtys: { ...draft.qtys, [k]: e.target.value } })}
+                              className="mt-1 w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <label className="block text-xs font-semibold text-stone-600">
+                        금액 (원) <span className="font-normal text-stone-400">비워두면 거래처 단가로 자동 계산</span>
+                        <input
+                          type="number"
+                          min="0"
+                          inputMode="numeric"
+                          value={draft.amount}
+                          onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+                          className="mt-1 w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm"
+                        />
+                      </label>
+                      <p className="text-[11px] text-stone-500">
+                        고치면 로스팅 목록과 수익관리의 같은 수기 입력도 함께 바뀌어요.
+                        {done ? " 이미 품목에 가져온 줄은 같이 갱신돼요." : ""}
+                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-red-600">{editErr}</span>
+                        <button
+                          type="button"
+                          disabled={editBusy}
+                          onClick={() => saveEdit(m)}
+                          className="rounded-lg bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                        >
+                          {editBusy ? "저장 중…" : "저장"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

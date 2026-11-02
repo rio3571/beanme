@@ -14,13 +14,14 @@ export default async function QuickStatementPage() {
   const admin = createAdminClient();
   const { data } = await admin
     .from("roast_manual")
-    .select("id, account, qtys, roast_date, amount, brand")
+    .select("id, account, account_id, qtys, roast_date, amount, brand")
     .order("roast_date", { ascending: false })
     .limit(300);
 
   const manualEntries: ManualEntry[] = (data ?? []).map((m) => ({
     id: m.id as string,
     account: (m.account as string) ?? "",
+    accountId: (m.account_id as string | null) ?? null,
     qtys: (m.qtys as Record<string, number>) ?? {},
     roastDate: (m.roast_date as string) ?? "",
     amount: (m.amount as number) ?? 0,

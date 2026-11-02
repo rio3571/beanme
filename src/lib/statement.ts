@@ -51,6 +51,49 @@ export function periodRange(key: string, billDay: number): [string, string] {
   return [from.toISOString().slice(0, 10), to.toISOString().slice(0, 10)];
 }
 
+type ManualRow = { id: string; qtys: Record<string, number> | null; amount: number | null; roast_date: string | null };
+
+/** 거래처 단가(account_prices → products.base_price) 맵: 품목명 → 단가 */
+async function loadUnitPrices(
+  admin: ReturnType<typeof createAdminClient>,
+  accountId: string
+): Promise<Map<string, number>> {
+  const [{ data: prodData }, { data: priceData }] = await Promise.all([
+    admin
+      .from("products")
+      .select("id, name, base_price")
+      .eq("active", true)
+      .or(`owner_account_id.is.null,owner_account_id.eq.${accountId}`),
+    admin.from("account_prices").select("product_id, unit_price").eq("account_id", accountId),
+  ]);
+  const byProduct = new Map((priceData ?? []).map((p) => [p.product_id as string, p.unit_price as number]));
+  const out = new Map<string, number>();
+  for (const p of prodData ?? []) {
+    out.set(p.name as string, byProduct.get(p.id as string) ?? ((p.base_price as number) ?? 0));
+  }
+  return out;
+}
+
+/** 수기 1건 → 명세서 행. 단가로 환산한 합계가 저장 금액과 맞으면 품목별로, 아니면 한 줄(저장 금액)로 */
+function manualToRows(m: ManualRow, prices: Map<string, number>): StmtRow[] {
+  const date = `${m.roast_date}T00:00:00+09:00`;
+  const items = Object.entries(m.qtys ?? {})
+    .map(([name, q]) => [name, Number(q) || 0] as const)
+    .filter(([, q]) => q > 0);
+  const stored = Math.round(Number(m.amount) || 0);
+  const known = items.length > 0 && items.every(([name]) => (prices.get(name) ?? 0) > 0);
+  const computed = known ? Math.round(items.reduce((sum, [name, q]) => sum + (prices.get(name) as number) * Math.round(q), 0)) : null;
+
+  if (computed !== null && (stored === 0 || Math.abs(stored - computed) <= 1)) {
+    return items.map(([name, q]) => {
+      const unitPrice = prices.get(name) as number;
+      return { date, floor: "", name, unit: "kg", qty: q, unitPrice, amount: unitPrice * Math.round(q) };
+    });
+  }
+  const label = items.map(([name, q]) => `${name} ${q}kg`).join(" · ") || "품목 미기재";
+  return [{ date, floor: "", name: `로스팅 · ${label}`, unit: "", qty: 1, unitPrice: stored, amount: stored }];
+}
+
 export async function loadStatement(
   accountId: string,
   ymParam?: string,
@@ -78,8 +121,17 @@ export async function loadStatement(
     unit: string | null;
   }[];
 
+  // 이 거래처에 연결된 로스팅 수기 입력 (간이로 거래 내역을 따로 만들 필요 없이 함께 집계)
+  const { data: manualData } = await admin
+    .from("roast_manual")
+    .select("id, qtys, amount, roast_date")
+    .eq("account_id", accountId)
+    .order("roast_date", { ascending: true });
+  const manuals = ((manualData ?? []) as ManualRow[]).filter((m) => !!m.roast_date);
+  const manualKey = (m: ManualRow) => periodKey(`${m.roast_date}T00:00:00+09:00`, billDay);
+
   const months = Array.from(
-    new Set(orders.map((o) => periodKey(o.created_at, billDay)))
+    new Set([...orders.map((o) => periodKey(o.created_at, billDay)), ...manuals.map(manualKey)])
   )
     .filter(Boolean)
     .sort()
@@ -126,6 +178,16 @@ export async function loadStatement(
         (a.floor || "").localeCompare(b.floor || "") ||
         a.date.localeCompare(b.date)
     );
+  }
+
+  // 해당 기간의 수기 입력을 행으로 합침
+  const periodManuals = manuals.filter((m) =>
+    customRange ? (m.roast_date as string) >= from && (m.roast_date as string) <= to : manualKey(m) === selectedYm
+  );
+  if (periodManuals.length > 0) {
+    const prices = await loadUnitPrices(admin, accountId);
+    for (const m of periodManuals) rows.push(...manualToRows(m, prices));
+    rows.sort((a, b) => (a.floor || "").localeCompare(b.floor || "") || a.date.localeCompare(b.date));
   }
 
   const total = rows.reduce((s, r) => s + r.amount, 0);

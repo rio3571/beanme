@@ -14,6 +14,7 @@ import CustomProductForm from "./CustomProductForm";
 import VisibilityForm from "./VisibilityForm";
 import UnitsForm from "./UnitsForm";
 import PasswordResetForm from "./PasswordResetForm";
+import ManualLinkCard, { type LinkedManual } from "./ManualLinkCard";
 import { DEFAULT_VAT } from "@/lib/vat";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,32 @@ export default async function AccountPricePage({
   const priceMap = new Map(
     (priceData ?? []).map((p) => [p.product_id as string, p.unit_price as number])
   );
+
+  // 로스팅 수기 입력 연동 현황
+  const [{ count: linkedCount }, { data: linkedData }, { count: unlinkedCount }] = await Promise.all([
+    admin.from("roast_manual").select("id", { count: "exact", head: true }).eq("account_id", id),
+    admin
+      .from("roast_manual")
+      .select("id, qtys, amount, roast_date")
+      .eq("account_id", id)
+      .order("roast_date", { ascending: false })
+      .limit(5),
+    admin
+      .from("roast_manual")
+      .select("id", { count: "exact", head: true })
+      .is("account_id", null)
+      .eq("account", account.company_name.trim()),
+  ]);
+  const recentManual: LinkedManual[] = (linkedData ?? []).map((m) => ({
+    id: m.id as string,
+    date: (m.roast_date as string) ?? "",
+    summary:
+      Object.entries((m.qtys as Record<string, number>) ?? {})
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `${k} ${v}kg`)
+        .join(" · ") || "품목 미기재",
+    amount: (m.amount as number) ?? 0,
+  }));
 
   const rows: PriceRow[] = products.map((p) => ({
     product_id: p.id,
@@ -166,11 +193,17 @@ export default async function AccountPricePage({
         initial={meta.carry ?? []}
       />
       <BankForm accountId={account.id} initial={meta.bank ?? ""} />
+      <ManualLinkCard
+        accountId={account.id}
+        linkedCount={linkedCount ?? 0}
+        unlinkedCount={unlinkedCount ?? 0}
+        recent={recentManual}
+      />
       <a
         href={`/portal/admin/accounts/${account.id}/statement`}
         className="block text-center rounded-xl border border-amber-600 text-amber-700 font-semibold py-2.5 mb-4 hover:bg-amber-50"
       >
-        📄 거래내역서 (월별) · PDF 다운로드
+        📄 거래내역서 (월별) · PDF 다운로드 <span className="text-xs font-normal">(연결된 수기 입력 포함)</span>
       </a>
       <UnitsForm
         accountId={account.id}
