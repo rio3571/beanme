@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { won } from "@/lib/format";
 import { SUPPLIER } from "@/lib/supplier";
 
@@ -29,26 +30,43 @@ const COLS: { key: NumKey; label: string; neg?: boolean }[] = [
   { key: "vat", label: "부가세(별도)" },
 ];
 
-const mLabel = (ym: string) => `${Number(ym.slice(5))}월`;
+const ymText = (ym: string) => `${ym.slice(0, 4)}년 ${Number(ym.slice(5))}월`;
 const pct = (profit: number, biz: number) => (biz > 0 ? `${((profit / biz) * 100).toFixed(1)}%` : "—");
 const cell = (key: NumKey, v: number) => (key === "kg" ? `${v.toLocaleString("ko-KR")}` : won(v));
+const shiftYm = (ym: string, d: number) => {
+  const [y, m] = ym.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1 + d, 1));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}`;
+};
 
-/** 월별 마감표 — 현금 매출을 뺀 회사 기준 매출·원가·실질이익을 한 해 단위로 */
+/** 월 마감표 — 현금 매출을 뺀 회사 기준 매출·원가·실질이익을 지정한 월 구간으로 */
 export default function MonthlyClose({
   brand,
-  year,
-  years,
-  onYear,
+  from,
+  to,
+  maxMonth,
+  onRange,
   rows,
   onPick,
 }: {
   brand: string;
-  year: string;
-  years: string[];
-  onYear: (y: string) => void;
+  from: string;
+  to: string;
+  maxMonth: string; // 이번 달
+  onRange: (from: string, to: string) => void;
   rows: CloseRow[];
   onPick: (ym: string) => void;
 }) {
+  const shotRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [lo, hi] = from <= to ? [from, to] : [to, from];
+  const sameYear = lo.slice(0, 4) === hi.slice(0, 4);
+  const rangeText = lo === hi ? ymText(lo) : `${ymText(lo)} ~ ${sameYear ? `${Number(hi.slice(5))}월` : ymText(hi)}`;
+  const mLabel = (ym: string) => (sameYear ? `${Number(ym.slice(5))}월` : `${ym.slice(2, 4)}.${ym.slice(5)}`);
+  const title = `월 마감표 · ${brand}`;
+  const fileBase = `월마감표_${brand}_${lo}${lo === hi ? "" : `_${hi}`}`;
+
   const total = rows.reduce(
     (t, r) => {
       for (const c of COLS) t[c.key] += r[c.key];
@@ -57,91 +75,119 @@ export default function MonthlyClose({
     },
     { ym: "합계", biz: 0, vat: 0, bean: 0, pkg: 0, proc: 0, fix: 0, profit: 0, cash: 0, kg: 0 } as CloseRow
   );
-  const title = `${year}년 월 마감표 · ${brand}`;
+
+  const year = maxMonth.slice(0, 4);
+  const presets: [string, string, string][] = [
+    ["이번 달", maxMonth, maxMonth],
+    ["지난 달", shiftYm(maxMonth, -1), shiftYm(maxMonth, -1)],
+    ["최근 3개월", shiftYm(maxMonth, -2), maxMonth],
+    ["올해", `${year}-01`, maxMonth],
+    ["작년", `${Number(year) - 1}-01`, `${Number(year) - 1}-12`],
+  ];
 
   function downloadCsv() {
     const head = ["월", ...COLS.map((c) => c.label), "이익률", "제외한 현금"];
-    const line = (r: CloseRow, label: string) =>
-      [label, ...COLS.map((c) => r[c.key]), pct(r.profit, r.biz), r.cash].join(",");
-    const csv = [head.join(","), ...rows.map((r) => line(r, `${year}-${r.ym.slice(5)}`)), line(total, "합계")].join("\r\n");
+    const line = (r: CloseRow, label: string) => [label, ...COLS.map((c) => r[c.key]), pct(r.profit, r.biz), r.cash].join(",");
+    const csv = [head.join(","), ...rows.map((r) => line(r, r.ym)), line(total, "합계")].join("\r\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `월마감표_${brand}_${year}.csv`;
+    a.download = `${fileBase}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
 
-  function print() {
-    const tr = (r: CloseRow, label: string, cls = "") =>
-      `<tr class="${cls}"><td>${label}</td>${COLS.map(
-        (c) => `<td class="r${c.neg ? " n" : ""}">${c.neg && r[c.key] ? "-" : ""}${cell(c.key, r[c.key] as number)}</td>`
-      ).join("")}<td class="r">${pct(r.profit, r.biz)}</td></tr>`;
-    const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${title}</title><style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#1c1917;padding:24px 28px;font-size:12px;}
-h1{font-size:20px;font-weight:800;}
-.sub{color:#78716c;font-size:11.5px;margin-top:4px;}
-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:11.5px;}
-th{background:#292524;color:#fff;padding:7px 8px;text-align:right;font-weight:600;}
-th:first-child,td:first-child{text-align:left;}
-td{padding:7px 8px;border-bottom:1px solid #e7e5e4;}
-td.r{text-align:right;}
-.n{color:#b91c1c;}
-tr.total td{background:#f5f5f4;font-weight:800;border-top:2px solid #292524;}
-.foot{margin-top:14px;font-size:10.5px;color:#78716c;line-height:1.6;}
-@media print{body{padding:0;}@page{size:A4 landscape;margin:12mm;}}
-</style></head><body>
-<h1>${title}</h1>
-<div class="sub">${SUPPLIER.name} · 사업자 ${SUPPLIER.bizNo} · 현금 매출 제외 · 금액은 공급가(VAT 별도)</div>
-<table><thead><tr><th>월</th>${COLS.map((c) => `<th>${c.label}</th>`).join("")}<th>이익률</th></tr></thead><tbody>
-${rows.map((r) => tr(r, mLabel(r.ym))).join("")}
-${tr(total, "합계", "total")}
-</tbody></table>
-<div class="foot">※ 실질이익 = 회사 매출(공급가·현금 제외) − 원두원가·포장재·가공비·고정비. 부가세는 수익이 아니라 따로 낼 금액. 이 기간 제외한 현금 매출 합계 ${won(
-      total.cash
-    )}. 원가는 현재 원가 설정 기준으로 계산됩니다.</div>
-</body></html>`;
-    const w = window.open("", "_blank", "width=1100,height=800");
-    if (!w) return alert("팝업이 차단됐어요. 팝업 허용 후 다시 시도해주세요.");
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 400);
+  async function saveImage() {
+    if (!shotRef.current) return;
+    setSaving(true);
+    try {
+      const { default: html2canvas } = await import("html2canvas-pro");
+      const canvas = await html2canvas(shotRef.current, { scale: 2, backgroundColor: "#ffffff" });
+      const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      if (!blob) throw new Error("이미지 생성 실패");
+      const file = new File([blob], `${fileBase}.png`, { type: "image/png" });
+      // 휴대폰: 공유 시트(사진 저장·카톡 전송) / PC: 바로 다운로드
+      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+      if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && nav.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `${title} · ${rangeText}` }).catch(() => {});
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+    } catch {
+      alert("이미지 저장에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setSaving(false);
+    }
   }
+
+  const tone = (c: (typeof COLS)[number], r: CloseRow) =>
+    c.neg
+      ? "text-rose-600"
+      : c.key === "profit"
+      ? `font-semibold ${r.profit < 0 ? "text-rose-700" : "text-stone-800"}`
+      : c.key === "vat"
+      ? "text-sky-700"
+      : c.key === "kg"
+      ? "text-stone-500"
+      : "";
+  const sign = (c: (typeof COLS)[number], v: number) => (c.neg && v ? "-" : "");
 
   return (
     <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
-      <div className="px-4 py-2.5 border-b border-stone-100 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <div className="px-4 py-2.5 border-b border-stone-100 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="font-semibold text-stone-700 text-sm">📅 월 마감표 · {brand}</span>
-          <select
-            value={year}
-            onChange={(e) => onYear(e.target.value)}
-            className="h-7 rounded-md border border-stone-300 px-1.5 text-xs"
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}년
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-1.5">
+            <button
+              onClick={saveImage}
+              disabled={saving || rows.length === 0}
+              className="text-xs font-semibold text-white bg-amber-700 rounded-md px-2.5 py-1 hover:bg-amber-800 disabled:opacity-40"
+            >
+              {saving ? "만드는 중…" : "🖼 이미지 저장"}
+            </button>
+            <button
+              onClick={downloadCsv}
+              disabled={rows.length === 0}
+              className="text-xs font-semibold text-stone-600 border border-stone-300 rounded-md px-2.5 py-1 hover:bg-stone-50 disabled:opacity-40"
+            >
+              엑셀(CSV)
+            </button>
+          </div>
         </div>
-        <div className="flex gap-1.5">
-          <button
-            onClick={downloadCsv}
-            className="text-xs font-semibold text-stone-600 border border-stone-300 rounded-md px-2.5 py-1 hover:bg-stone-50"
-          >
-            엑셀(CSV)
-          </button>
-          <button
-            onClick={print}
-            className="text-xs font-semibold text-amber-700 border border-amber-200 rounded-md px-2.5 py-1 hover:bg-amber-50"
-          >
-            🖨 출력
-          </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <input
+            type="month"
+            value={from}
+            max={maxMonth}
+            onChange={(e) => e.target.value && onRange(e.target.value, to)}
+            className="h-8 rounded-md border border-stone-300 px-2 text-sm"
+          />
+          <span className="text-stone-400">~</span>
+          <input
+            type="month"
+            value={to}
+            max={maxMonth}
+            onChange={(e) => e.target.value && onRange(from, e.target.value)}
+            className="h-8 rounded-md border border-stone-300 px-2 text-sm"
+          />
+          {presets.map(([label, f, t]) => (
+            <button
+              key={label}
+              onClick={() => onRange(f, t)}
+              className={`h-8 rounded-full border px-2.5 text-xs font-medium ${
+                lo === f && hi === t ? "border-amber-700 bg-amber-700 text-white" : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
+
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-sm border-collapse">
           <thead>
@@ -160,22 +206,9 @@ ${tr(total, "합계", "total")}
               <tr key={r.ym} onClick={() => onPick(r.ym)} className="cursor-pointer hover:bg-amber-50/50">
                 <td className="px-3 py-2 font-medium text-stone-800 whitespace-nowrap">{mLabel(r.ym)}</td>
                 {COLS.map((c) => (
-                  <td
-                    key={c.key}
-                    className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${
-                      c.neg
-                        ? "text-rose-600"
-                        : c.key === "profit"
-                        ? `font-semibold ${r.profit < 0 ? "text-rose-700" : "text-stone-800"}`
-                        : c.key === "vat"
-                        ? "text-sky-700"
-                        : c.key === "kg"
-                        ? "text-stone-500"
-                        : ""
-                    }`}
-                  >
-                    {c.neg && r[c.key] ? "-" : ""}
-                    {cell(c.key, r[c.key] as number)}
+                  <td key={c.key} className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${tone(c, r)}`}>
+                    {sign(c, r[c.key])}
+                    {cell(c.key, r[c.key])}
                   </td>
                 ))}
                 <td className="px-3 py-2 text-right tabular-nums text-stone-500">{pct(r.profit, r.biz)}</td>
@@ -184,12 +217,12 @@ ${tr(total, "합계", "total")}
             {rows.length === 0 && (
               <tr>
                 <td colSpan={COLS.length + 2} className="px-3 py-5 text-center text-stone-400">
-                  {year}년 내역이 없어요.
+                  {rangeText} 내역이 없어요.
                 </td>
               </tr>
             )}
           </tbody>
-          {rows.length > 0 && (
+          {rows.length > 1 && (
             <tfoot>
               <tr className="border-t-2 border-stone-200 bg-stone-50 font-bold text-stone-800">
                 <td className="px-3 py-2">합계</td>
@@ -200,8 +233,8 @@ ${tr(total, "합계", "total")}
                       c.neg ? "text-rose-600" : c.key === "profit" ? "text-emerald-700" : ""
                     }`}
                   >
-                    {c.neg && total[c.key] ? "-" : ""}
-                    {cell(c.key, total[c.key] as number)}
+                    {sign(c, total[c.key])}
+                    {cell(c.key, total[c.key])}
                   </td>
                 ))}
                 <td className="px-3 py-2 text-right tabular-nums">{pct(total.profit, total.biz)}</td>
@@ -211,8 +244,65 @@ ${tr(total, "합계", "total")}
         </table>
       </div>
       <div className="px-4 py-2 text-[11px] text-stone-400 leading-relaxed">
-        ※ 현금 매출을 뺀 회사 기준(공급가)이에요. 이 기간 제외한 현금 매출 {won(total.cash)}. 월을 누르면 위
-        요약이 그 달로 바뀌어요. 원가는 현재 원가 설정 기준이에요.
+        ※ 현금 매출을 뺀 회사 기준(공급가)이에요. 이 기간 제외한 현금 매출 {won(total.cash)}. 월을 누르면 위 요약이 그
+        달로 바뀌어요. 원가는 현재 원가 설정 기준이에요.
+      </div>
+
+      {/* 이미지 저장용 (화면 밖, 고정 폭) */}
+      <div aria-hidden style={{ position: "fixed", left: -10000, top: 0 }}>
+        <div ref={shotRef} style={{ width: 1000, padding: 32, background: "#fff", color: "#1c1917", fontFamily: "'Malgun Gothic','Apple SD Gothic Neo',sans-serif" }}>
+          <div style={{ fontSize: 24, fontWeight: 800 }}>{title}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginTop: 4, color: "#92400e" }}>{rangeText}</div>
+          <div style={{ fontSize: 12, color: "#78716c", marginTop: 4 }}>
+            {SUPPLIER.name} · 사업자 {SUPPLIER.bizNo} · 현금 매출 제외 · 공급가(VAT 별도)
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 16, fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#292524", color: "#fff" }}>
+                <th style={{ padding: "8px 10px", textAlign: "left" }}>월</th>
+                {COLS.map((c) => (
+                  <th key={c.key} style={{ padding: "8px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                    {c.label}
+                  </th>
+                ))}
+                <th style={{ padding: "8px 10px", textAlign: "right" }}>이익률</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...rows, ...(rows.length > 1 ? [total] : [])].map((r) => {
+                const isTotal = r === total;
+                return (
+                  <tr
+                    key={r.ym}
+                    style={isTotal ? { background: "#f5f5f4", fontWeight: 800, borderTop: "2px solid #292524" } : { borderBottom: "1px solid #e7e5e4" }}
+                  >
+                    <td style={{ padding: "8px 10px", fontWeight: 700 }}>{isTotal ? "합계" : mLabel(r.ym)}</td>
+                    {COLS.map((c) => (
+                      <td
+                        key={c.key}
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          whiteSpace: "nowrap",
+                          color: c.neg ? "#b91c1c" : c.key === "vat" ? "#0369a1" : c.key === "profit" ? (r.profit < 0 ? "#b91c1c" : "#047857") : undefined,
+                          fontWeight: c.key === "profit" ? 700 : undefined,
+                        }}
+                      >
+                        {sign(c, r[c.key])}
+                        {cell(c.key, r[c.key])}
+                      </td>
+                    ))}
+                    <td style={{ padding: "8px 10px", textAlign: "right" }}>{pct(r.profit, r.biz)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div style={{ marginTop: 14, fontSize: 11.5, color: "#78716c", lineHeight: 1.6 }}>
+            ※ 실질이익 = 회사 매출(공급가·현금 제외) − 원두원가·포장재·가공비·고정비. 부가세는 수익이 아니라 따로 낼 금액.
+            제외한 현금 매출 {won(total.cash)}. 원가는 현재 원가 설정 기준.
+          </div>
+        </div>
       </div>
     </div>
   );

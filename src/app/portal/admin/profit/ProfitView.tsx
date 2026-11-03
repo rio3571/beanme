@@ -77,7 +77,8 @@ export default function ProfitView({
   const [month, setMonth] = useState(defaultMonth);
   const [period, setPeriod] = useState<"월" | "분기">("월");
   const [showCfg, setShowCfg] = useState(false);
-  const [closeYear, setCloseYear] = useState(defaultMonth.slice(0, 4));
+  const [closeFrom, setCloseFrom] = useState(`${defaultMonth.slice(0, 4)}-01`);
+  const [closeTo, setCloseTo] = useState(defaultMonth);
   const [saving, startSave] = useTransition();
   const [, startAct] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -257,10 +258,22 @@ export default function ProfitView({
         : 0,
   };
 
-  // 월 마감표: 선택 연도의 월별 결과 (현금 제외 회사 기준)
-  const closeYears = [...new Set([...months.map((m) => m.slice(0, 4)), defaultMonth.slice(0, 4)])].sort().reverse();
-  const closeRows: CloseRow[] = Array.from({ length: 12 }, (_, i) => `${closeYear}-${String(i + 1).padStart(2, "0")}`)
-    .filter((ym) => ym <= defaultMonth)
+  // 월 마감표: 지정한 월 구간의 월별 결과 (현금 제외 회사 기준)
+  const closeKeys: string[] = [];
+  {
+    const [lo, hi] = closeFrom <= closeTo ? [closeFrom, closeTo] : [closeTo, closeFrom];
+    let [y, m] = lo.split("-").map(Number);
+    for (let i = 0; i < 60; i++) {
+      const k = `${y}-${String(m).padStart(2, "0")}`;
+      if (k > hi) break;
+      closeKeys.push(k);
+      if (++m > 12) {
+        m = 1;
+        y++;
+      }
+    }
+  }
+  const closeRows: CloseRow[] = closeKeys
     .map((ym) => {
       const hy = calc(aggMonths(monthHY, [ym]), cfg.fixed.hyShare, false);
       const pu = calc(aggMonths(monthPU, [ym]), 1 - cfg.fixed.hyShare, true);
@@ -278,7 +291,7 @@ export default function ProfitView({
         kg: pick("totalKg"),
       };
     })
-    .filter((r) => r.kg > 0 || r.biz > 0 || r.cash > 0 || r.ym === defaultMonth);
+    .filter((r) => r.kg > 0 || r.biz > 0 || r.cash > 0 || closeKeys.length <= 3);
 
   // 합산용 kg 병합 (품목 표시용)
   const mergedKg: Record<string, number> = {};
@@ -554,9 +567,13 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
 
       <MonthlyClose
         brand={brand}
-        year={closeYear}
-        years={closeYears}
-        onYear={setCloseYear}
+        from={closeFrom}
+        to={closeTo}
+        maxMonth={defaultMonth}
+        onRange={(f, t) => {
+          setCloseFrom(f);
+          setCloseTo(t);
+        }}
         rows={closeRows}
         onPick={(ym) => {
           setPeriod("월");
