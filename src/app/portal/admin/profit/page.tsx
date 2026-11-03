@@ -11,6 +11,7 @@ import ProfitView, {
   type PuEntry,
   type HyDetailRow,
 } from "./ProfitView";
+import type { GreenPurchase } from "./GreenCheck";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function ProfitPage() {
     { data: acctRows },
     { data: priceRows },
     { data: prodRows },
+    { data: greenRows },
   ] = await Promise.all([
     admin.from("roast_config").select("data").eq("id", 1).maybeSingle(),
     admin
@@ -45,7 +47,21 @@ export default async function ProfitPage() {
     admin.from("b2b_accounts").select("id, company_name, memo"),
     admin.from("account_prices").select("account_id, product_id, unit_price"),
     admin.from("products").select("id, name, base_price").eq("active", true),
+    admin
+      .from("green_purchases")
+      .select("id, paid_on, for_month, amount, vat_included, kg, supplier, memo")
+      .order("paid_on", { ascending: false }),
   ]);
+  const greenPurchases: GreenPurchase[] = (greenRows ?? []).map((g) => ({
+    id: g.id as string,
+    paidOn: g.paid_on as string,
+    forMonth: g.for_month as string,
+    amount: (g.amount as number) ?? 0,
+    vatIncluded: g.vat_included === true,
+    kg: g.kg == null ? null : Number(g.kg),
+    supplier: (g.supplier as string) ?? "",
+    memo: (g.memo as string) ?? "",
+  }));
 
   const config = mergeConfig(cfgRow?.data);
 
@@ -259,6 +275,7 @@ export default async function ProfitPage() {
       hyDetail={hyDetail}
       months={months}
       defaultMonth={kstYm}
+      greenPurchases={greenPurchases}
     />
   );
 }

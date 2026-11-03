@@ -20,6 +20,7 @@ import {
   setManualOem,
 } from "../roasting/actions";
 import MonthlyClose, { type CloseRow } from "./MonthlyClose";
+import GreenCheck, { type GreenPurchase } from "./GreenCheck";
 
 export type MonthAgg = {
   orderRevenue: number;
@@ -61,6 +62,7 @@ export default function ProfitView({
   hyDetail,
   months,
   defaultMonth,
+  greenPurchases,
 }: {
   config: RoastConfig;
   monthHY: Record<string, MonthAgg>;
@@ -70,6 +72,7 @@ export default function ProfitView({
   hyDetail: Record<string, HyDetailRow[]>;
   months: string[];
   defaultMonth: string;
+  greenPurchases: GreenPurchase[];
 }) {
   const router = useRouter();
   const [cfg, setCfg] = useState<RoastConfig>(config);
@@ -580,6 +583,19 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
           setMonth(ym);
           window.scrollTo({ top: 0, behavior: "smooth" });
         }}
+      />
+
+      <GreenCheck
+        cfg={cfg}
+        months={closeKeys.map((ym) => {
+          const kg: Record<string, number> = {};
+          for (const src of [monthHY[ym]?.kg ?? {}, monthPU[ym]?.kg ?? {}])
+            for (const [p, v] of Object.entries(src)) kg[p] = (kg[p] ?? 0) + v;
+          return { ym, kg };
+        })}
+        purchases={greenPurchases}
+        defaultMonth={defaultMonth}
+        onChanged={refresh}
       />
 
       {/* 품목별 */}
