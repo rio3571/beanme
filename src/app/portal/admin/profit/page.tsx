@@ -20,7 +20,9 @@ export default async function ProfitPage() {
   if (me.role !== "admin") redirect("/portal/order");
 
   const admin = createAdminClient();
-  const fromIso = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString();
+  // 월 마감표(연 단위)를 위해 작년 1월 1일(KST)부터
+  const kstYear = new Date(Date.now() + 9 * 3600 * 1000).getUTCFullYear();
+  const fromIso = new Date(Date.UTC(kstYear - 1, 0, 1) - 9 * 3600 * 1000).toISOString();
 
   const [
     { data: cfgRow },
@@ -36,7 +38,7 @@ export default async function ProfitPage() {
       .select("id, created_at, account_id")
       .neq("status", "canceled")
       .gte("created_at", fromIso)
-      .limit(2000),
+      .limit(10000),
     admin
       .from("roast_manual")
       .select("id, account, qtys, roast_date, amount, brand, cash, oem, account_id"),
@@ -147,11 +149,16 @@ export default async function ProfitPage() {
 
   // 희연재 = 포털 주문
   if (orderIds.length > 0) {
-    const { data: items } = await admin
-      .from("b2b_order_items")
-      .select("order_id, product_name, qty, line_amount")
-      .in("order_id", orderIds);
-    for (const it of items ?? []) {
+    // 주문 id가 많아지면 URL이 길어져 실패하므로 나눠서 조회
+    const chunks: string[][] = [];
+    for (let i = 0; i < orderIds.length; i += 150) chunks.push(orderIds.slice(i, i + 150));
+    const parts = await Promise.all(
+      chunks.map((ids) =>
+        admin.from("b2b_order_items").select("order_id, product_name, qty, line_amount").in("order_id", ids)
+      )
+    );
+    const items = parts.flatMap((p) => p.data ?? []);
+    for (const it of items) {
       const oid = it.order_id as string;
       const created = orderDate.get(oid);
       if (!created) continue;

@@ -19,6 +19,7 @@ import {
   setManualCash,
   setManualOem,
 } from "../roasting/actions";
+import MonthlyClose, { type CloseRow } from "./MonthlyClose";
 
 export type MonthAgg = {
   orderRevenue: number;
@@ -44,6 +45,7 @@ export type HyDetailRow = {
 };
 
 type Brand = "희연재" | "푸르파파" | "합산";
+type CloseKey = "bizRevenue" | "vat" | "beanCost" | "pkgCost" | "procCost" | "fix" | "profit" | "cash" | "totalKg";
 
 function fmtMonth(ym: string): string {
   const [y, m] = ym.split("-");
@@ -75,6 +77,7 @@ export default function ProfitView({
   const [month, setMonth] = useState(defaultMonth);
   const [period, setPeriod] = useState<"월" | "분기">("월");
   const [showCfg, setShowCfg] = useState(false);
+  const [closeYear, setCloseYear] = useState(defaultMonth.slice(0, 4));
   const [saving, startSave] = useTransition();
   const [, startAct] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -171,7 +174,7 @@ export default function ProfitView({
       : [1, 2, 3].map((i) => `${pY}-${String(qIdx * 3 + i).padStart(2, "0")}`);
   const periodLabel =
     period === "월" ? fmtMonth(month) : `${pY}년 ${qIdx + 1}분기`;
-  const aggMonths = (src: Record<string, MonthAgg>): MonthAgg => {
+  const aggMonths = (src: Record<string, MonthAgg>, keys: string[] = periodKeys): MonthAgg => {
     const out: MonthAgg = {
       orderRevenue: 0,
       manualRevenue: 0,
@@ -179,7 +182,7 @@ export default function ProfitView({
       kg: {},
       oemKg: 0,
     };
-    for (const k of periodKeys) {
+    for (const k of keys) {
       const m = src[k];
       if (!m) continue;
       out.orderRevenue += m.orderRevenue;
@@ -253,6 +256,29 @@ export default function ProfitView({
           100
         : 0,
   };
+
+  // 월 마감표: 선택 연도의 월별 결과 (현금 제외 회사 기준)
+  const closeYears = [...new Set([...months.map((m) => m.slice(0, 4)), defaultMonth.slice(0, 4)])].sort().reverse();
+  const closeRows: CloseRow[] = Array.from({ length: 12 }, (_, i) => `${closeYear}-${String(i + 1).padStart(2, "0")}`)
+    .filter((ym) => ym <= defaultMonth)
+    .map((ym) => {
+      const hy = calc(aggMonths(monthHY, [ym]), cfg.fixed.hyShare, false);
+      const pu = calc(aggMonths(monthPU, [ym]), 1 - cfg.fixed.hyShare, true);
+      const pick = (k: CloseKey) => (brand === "희연재" ? hy[k] : brand === "푸르파파" ? pu[k] : hy[k] + pu[k]);
+      return {
+        ym,
+        biz: pick("bizRevenue"),
+        vat: pick("vat"),
+        bean: pick("beanCost"),
+        pkg: pick("pkgCost"),
+        proc: pick("procCost"),
+        fix: pick("fix"),
+        profit: pick("profit"),
+        cash: pick("cash"),
+        kg: pick("totalKg"),
+      };
+    })
+    .filter((r) => r.kg > 0 || r.biz > 0 || r.cash > 0 || r.ym === defaultMonth);
 
   // 합산용 kg 병합 (품목 표시용)
   const mergedKg: Record<string, number> = {};
@@ -525,6 +551,19 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
         )}
         {metric("가공비", won(procCost), "bg-white border-stone-200", cfg.processing ? `${cfg.processing}원/kg` : "—")}
       </div>
+
+      <MonthlyClose
+        brand={brand}
+        year={closeYear}
+        years={closeYears}
+        onYear={setCloseYear}
+        rows={closeRows}
+        onPick={(ym) => {
+          setPeriod("월");
+          setMonth(ym);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
 
       {/* 품목별 */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
