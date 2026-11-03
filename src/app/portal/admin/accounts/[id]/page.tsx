@@ -16,6 +16,7 @@ import UnitsForm from "./UnitsForm";
 import PasswordResetForm from "./PasswordResetForm";
 import ManualLinkCard, { type LinkedManual } from "./ManualLinkCard";
 import { DEFAULT_VAT } from "@/lib/vat";
+import { loadPayments } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,8 @@ export default async function AccountPricePage({
     amount: (m.amount as number) ?? 0,
   }));
 
+  const pay = await loadPayments(id);
+
   const rows: PriceRow[] = products.map((p) => ({
     product_id: p.id,
     name: p.name,
@@ -199,6 +202,27 @@ export default async function AccountPricePage({
         unlinkedCount={unlinkedCount ?? 0}
         recent={recentManual}
       />
+      <Link
+        href={`/portal/admin/accounts/${account.id}/payments`}
+        className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-3 mb-3 hover:opacity-90 ${
+          pay && pay.unpaid.length ? "border-rose-300 bg-rose-50" : "border-stone-200 bg-white"
+        }`}
+      >
+        <span className="font-semibold text-stone-800">💳 입금 관리</span>
+        <span className="text-sm">
+          {pay && pay.unpaid.length ? (
+            <b className="text-rose-700">
+              미입금 {pay.unpaid.length}건 · {pay.unpaidTotal.toLocaleString("ko-KR")}원
+            </b>
+          ) : (
+            <span className="text-stone-500">미입금 없음</span>
+          )}
+          {pay && pay.credit > 0 && (
+            <span className="ml-2 text-emerald-700">잔액 {pay.credit.toLocaleString("ko-KR")}원</span>
+          )}
+          <span className="ml-1 text-stone-400">›</span>
+        </span>
+      </Link>
       <a
         href={`/portal/admin/accounts/${account.id}/statement`}
         className="block text-center rounded-xl border border-amber-600 text-amber-700 font-semibold py-2.5 mb-4 hover:bg-amber-50"
