@@ -31,7 +31,7 @@ export default async function PortalHome() {
     created_at: string;
   }[];
 
-  const monthOrders = orders.filter((o) => ym(o.created_at) === thisYm);
+  const monthOrders = orders.filter((o) => ym(o.created_at) === thisYm && o.status !== "canceled");
   const monthCount = monthOrders.length;
   const monthSales = monthOrders.reduce((s, o) => s + (o.total_amount || 0), 0);
 

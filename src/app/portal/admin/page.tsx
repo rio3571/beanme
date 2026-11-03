@@ -47,7 +47,7 @@ export default async function AdminDashboard() {
     created_at: string;
     status: string;
   }[];
-  const monthOrders = orders.filter((o) => ym(o.created_at) === thisYm);
+  const monthOrders = orders.filter((o) => ym(o.created_at) === thisYm && o.status !== "canceled");
   const monthCount = monthOrders.length;
   const pendingCount = orders.filter((o) => o.status === "requested").length;
 

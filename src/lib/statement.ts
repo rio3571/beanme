@@ -114,6 +114,7 @@ export async function loadStatement(
     .from("b2b_orders")
     .select("id, created_at, unit")
     .eq("account_id", accountId)
+    .neq("status", "canceled")
     .order("created_at", { ascending: true });
   const orders = (orderData ?? []) as {
     id: string;
