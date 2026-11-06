@@ -14,6 +14,7 @@ import CustomProductForm from "./CustomProductForm";
 import VisibilityForm from "./VisibilityForm";
 import UnitsForm from "./UnitsForm";
 import PasswordResetForm from "./PasswordResetForm";
+import IssueLoginForm from "./IssueLoginForm";
 import ManualLinkCard, { type LinkedManual } from "./ManualLinkCard";
 import { DEFAULT_VAT } from "@/lib/vat";
 import { loadPayments } from "@/lib/payments";
@@ -173,6 +174,7 @@ export default async function AccountPricePage({
             화면의 <b>＋ 거래처 대신 주문 넣기</b>로 등록하세요. 단가·거래명세서·로스팅
             목록은 아이디 있는 거래처와 똑같이 동작합니다.
           </p>
+          <IssueLoginForm accountId={account.id} />
         </div>
       )}
 

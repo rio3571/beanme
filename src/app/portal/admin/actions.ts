@@ -205,6 +205,60 @@ export async function createAccount(
   return { error: null, ok: true };
 }
 
+/** 아이디 없이 등록한 거래처에 포털 아이디 발급 (주문·단가·수기 연결 등 기존 데이터 그대로 유지) */
+export async function issueAccountLogin(
+  accountId: string,
+  loginId: string,
+  password: string
+): Promise<{ ok: boolean; error?: string }> {
+  const me = await getMyAccount();
+  if (!me || me.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  const id = loginId.trim();
+  if (!id || !password) return { ok: false, error: "아이디·비밀번호를 입력하세요." };
+  if (!validLoginId(id)) return { ok: false, error: "아이디는 영문/숫자(. _ - 가능) 또는 이메일 형식이어야 해요." };
+  if (password.length < 6) return { ok: false, error: "비밀번호는 6자 이상이어야 해요." };
+
+  const admin = createAdminClient();
+  const { data: acct } = await admin
+    .from("b2b_accounts")
+    .select("auth_user_id, memo, email")
+    .eq("id", accountId)
+    .maybeSingle();
+  if (!acct) return { ok: false, error: "거래처를 찾을 수 없어요." };
+  if (acct.auth_user_id) return { ok: false, error: "이미 아이디가 있는 거래처예요." };
+  const oldEmail = ((acct.email as string | null) ?? "").trim();
+
+  const email = toAuthEmail(id);
+  const { data: created, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (error || !created.user) {
+    const dup = /already|registered|exists/i.test(error?.message ?? "");
+    return { ok: false, error: dup ? "이미 쓰고 있는 아이디예요." : "아이디 생성 실패: " + (error?.message ?? "알 수 없음") };
+  }
+
+  const meta = parseMeta(acct.memo as string | null);
+  // email 칸은 로그인 식별자로 바뀌므로, 기존에 적어둔 실제 메일은 세금계산서 메일로 옮겨 보존
+  if (oldEmail && oldEmail !== email && !meta.tax?.email) {
+    meta.tax = { ...(meta.tax ?? {}), email: oldEmail };
+  }
+  const { error: upErr } = await admin
+    .from("b2b_accounts")
+    .update({ auth_user_id: created.user.id, email, memo: stringifyMeta({ ...meta, pw: password }) })
+    .eq("id", accountId)
+    .is("auth_user_id", null);
+  if (upErr) {
+    await admin.auth.admin.deleteUser(created.user.id);
+    return { ok: false, error: "저장 실패: " + upErr.message };
+  }
+  revalidatePath(`/portal/admin/accounts/${accountId}`);
+  revalidatePath("/portal/admin/accounts");
+  revalidatePath("/portal/admin/orders");
+  return { ok: true };
+}
+
 export async function setPrices(
   accountId: string,
   rows: { product_id: string; unit_price: number | null }[]
