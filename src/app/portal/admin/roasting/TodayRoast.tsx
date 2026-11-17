@@ -142,7 +142,10 @@ export default function TodayRoast({
       amount: amt,
       accountId,
       cash,
-    }).then(refresh);
+    }).then((r) => {
+      if (!r.ok) alert("수기 저장에 실패했어요. 다시 입력해 주세요.");
+      refresh();
+    });
   }
   function remove(id: string) {
     removeManualRoast(id).then(refresh);
@@ -201,6 +204,10 @@ export default function TodayRoast({
   // 현재 배치에 속한 수기 (배치일 일치 또는 날짜없는 레거시)
   const batchEntries = entries.filter(
     (e) => e.roastDate === batchKey || !e.roastDate
+  );
+  // 지난 배치에 넣었는데 아직 완료 안 한 수기 — 배치일이 넘어가도 사라지지 않게 목록에 계속 표시 (합계는 현재 배치만)
+  const carryEntries = entries.filter(
+    (e) => !e.done && !!e.roastDate && e.roastDate < batchKey
   );
 
   // 합계 (주문 + 이 배치 수기)
@@ -302,7 +309,7 @@ export default function TodayRoast({
                 />
               ))}
               {/* 수기 행 */}
-              {batchEntries.map((e) =>
+              {[...carryEntries, ...batchEntries].map((e) =>
                 editId === e.id ? (
                   <tr key={e.id} className="bg-sky-50/60">
                     <td className="px-3 py-2 whitespace-nowrap">
@@ -373,6 +380,14 @@ export default function TodayRoast({
                       <span className="mr-1 text-[10px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5 align-middle">
                         수기
                       </span>
+                      {e.roastDate && e.roastDate < batchKey && (
+                        <span
+                          title="지난 배치에서 아직 완료 처리하지 않은 수기"
+                          className="mr-1 text-[10px] font-bold text-rose-700 bg-rose-100 rounded px-1 py-0.5 align-middle"
+                        >
+                          {e.roastDate.slice(5).replace("-", "/")} 미완료
+                        </span>
+                      )}
                       {e.accountId && (
                         <span
                           title="기존 거래처 연결됨"
@@ -481,7 +496,7 @@ export default function TodayRoast({
                   </tr>
                 )
               )}
-              {rows.length === 0 && batchEntries.length === 0 && (
+              {rows.length === 0 && batchEntries.length === 0 && carryEntries.length === 0 && (
                 <tr>
                   <td
                     colSpan={columns.length + 2}

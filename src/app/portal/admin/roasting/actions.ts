@@ -73,7 +73,7 @@ export async function addManualRoast(input: {
     amount = (await amountFromPrices(admin, input.accountId, input.qtys ?? {})) ?? 0;
   }
 
-  await admin.from("roast_manual").insert({
+  const { error: insErr } = await admin.from("roast_manual").insert({
     account: (input.account ?? "").trim(),
     qtys: input.qtys ?? {},
     roast_date: input.roastDate,
@@ -83,6 +83,10 @@ export async function addManualRoast(input: {
     cash: input.cash === true,
     oem: input.oem === true,
   });
+  if (insErr) {
+    console.error("addManualRoast insert failed", insErr);
+    return { ok: false };
+  }
   revalidatePath("/portal/admin/roasting");
   revalidatePath("/portal/admin/profit");
   return { ok: true };
