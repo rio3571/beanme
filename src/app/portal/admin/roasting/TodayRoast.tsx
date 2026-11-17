@@ -71,6 +71,7 @@ export default function TodayRoast({
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const [showCarry, setShowCarry] = useState(false);
   const [account, setAccount] = useState("");
   const [vals, setVals] = useState<Record<string, string>>({});
   const [amount, setAmount] = useState("");
@@ -309,7 +310,20 @@ export default function TodayRoast({
                 />
               ))}
               {/* 수기 행 */}
-              {[...carryEntries, ...batchEntries].map((e) =>
+              {carryEntries.length > 0 && (
+                <tr className="bg-rose-50/60">
+                  <td colSpan={columns.length + 5} className="px-3 py-1.5">
+                    <button
+                      onClick={() => setShowCarry((v) => !v)}
+                      className="text-xs font-semibold text-rose-700 hover:underline"
+                    >
+                      {showCarry ? "▾" : "▸"} 지난 배치 미완료 수기 {carryEntries.length}건
+                      {showCarry ? " 접기" : " 보기"}
+                    </button>
+                  </td>
+                </tr>
+              )}
+              {[...(showCarry ? carryEntries : []), ...batchEntries].map((e) =>
                 editId === e.id ? (
                   <tr key={e.id} className="bg-sky-50/60">
                     <td className="px-3 py-2 whitespace-nowrap">
