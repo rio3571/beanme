@@ -585,19 +585,6 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
         }}
       />
 
-      <GreenCheck
-        cfg={cfg}
-        months={closeKeys.map((ym) => {
-          const kg: Record<string, number> = {};
-          for (const src of [monthHY[ym]?.kg ?? {}, monthPU[ym]?.kg ?? {}])
-            for (const [p, v] of Object.entries(src)) kg[p] = (kg[p] ?? 0) + v;
-          return { ym, kg };
-        })}
-        purchases={greenPurchases}
-        defaultMonth={defaultMonth}
-        onChanged={refresh}
-      />
-
       {/* 품목별 */}
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden mb-4">
         <div className="px-4 py-2.5 border-b border-stone-100 font-semibold text-stone-700 text-sm">
@@ -1475,6 +1462,19 @@ ${row("현금 매출(대표님 개인)", hyCash, puCash)}
           </div>
         )}
       </div>
+
+      <GreenCheck
+        cfg={cfg}
+        months={closeKeys.map((ym) => {
+          const kg: Record<string, number> = {};
+          for (const src of [monthHY[ym]?.kg ?? {}, monthPU[ym]?.kg ?? {}])
+            for (const [p, v] of Object.entries(src)) kg[p] = (kg[p] ?? 0) + v;
+          return { ym, kg };
+        })}
+        purchases={greenPurchases}
+        defaultMonth={defaultMonth}
+        onChanged={refresh}
+      />
     </div>
   );
 }
