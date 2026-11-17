@@ -19,6 +19,7 @@ export type AcctMeta = {
   units?: string[]; // 층/부서 (공용 아이디에서 주문 시 선택). 예: ["23층","24층"]
   billDay?: number; // 정산 시작일(1~28). 예: 26 → 전월26~당월25 주기. 미설정/1=달력월
   hidden?: string[]; // 이 거래처 주문화면에서 숨길 공용 품목 id (전용 블렌드만 쓰는 곳)
+  payTrack?: boolean; // 💳 입금 관리 적용 여부 (기본 미적용)
 };
 
 function parseTax(v: unknown): TaxInfo | undefined {
@@ -56,6 +57,7 @@ export function parseMeta(memo: string | null | undefined): AcctMeta {
           Array.isArray(o.hidden) && o.hidden.length
             ? o.hidden.filter((x: unknown) => typeof x === "string")
             : undefined,
+        payTrack: o.payTrack === true ? true : undefined,
       };
     } catch {
       return { bank: s };
@@ -83,5 +85,6 @@ export function stringifyMeta(m: AcctMeta): string | null {
     const h = m.hidden.map((s) => String(s).trim()).filter(Boolean);
     if (h.length) o.hidden = h;
   }
+  if (m.payTrack === true) o.payTrack = true;
   return Object.keys(o).length ? JSON.stringify(o) : null;
 }
